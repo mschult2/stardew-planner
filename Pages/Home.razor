@@ -60,28 +60,41 @@
     <h4>Generated Calendar</h4>
     <button @onclick="GenerateCalendar">Generate Schedule</button>
     <div>
+        <p></p>
+        <p>Planting days are highlighted in green. On these days you should have gold from the previous day's harvest, so ideally spend all of it on the indicated crop's seeds and plant them.</p>
+        <p>An optimal crop-to-plant is indicated for the other days too, in case you obtain some extra gold on these days.</p>
+    </div>
+
+    <div>
         @if (Schedule != null)
         {
             <table class="calendar-table">
                 <thead>
                     <tr>
-                        <th>Day</th>
-                        <th>Crop to Plant</th>
-                        <th>Harvest Payday</th>
+                        <th>Monday</th>
+                        <th>Tuesday</th>
+                        <th>Wednesday</th>
+                        <th>Thursday</th>
+                        <th>Friday</th>
+                        <th>Saturday</th>
+                        <th>Sunday</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @for (int day = 1; day <= NumDays; day++)
+                    @for (int week = 0; week < 4; week++) // 4 weeks
                     {
-                        var crop = Schedule.GetCrop(day);
+                        <tr>
+                            @for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) // 7 days in a week
+                            {
+                                int day = week * 7 + dayOfWeek;
+                                var crop = Schedule.GetCrop(day);
 
-                        string className = PlantingDays[day] && crop != null ? "harvest-day" : "";
-                        Console.WriteLine($"Day {day}: class: {className}");
-
-                        <tr class="@(PlantingDays[day] && crop != null ? "harvest-day" : "")">
-                            <td>@day</td>
-                            <td>@(crop != null ? crop.name : "No Crop")</td>
-                            <td>@(PlantingDays[day] && crop != null ? "⭐ Yes ⭐" : "No")</td>
+                                <td class="@(PlantingDays[day] && crop != null ? "harvest-day" : "")">
+                                    <div><strong>Day @day</strong></div>
+                                    <div>@(crop != null ? crop.name : "No Crop")</div>
+                                    @* <div>@(PlantingDays[day] && crop != null ? "⭐ Yes ⭐" : "No")</div> *@
+                                </td>
+                            }
                         </tr>
                     }
                 </tbody>
@@ -103,21 +116,18 @@
         .calendar-table th, .calendar-table td {
             border: 1px solid #ddd;
             padding: 8px;
-            text-align: left;
+            text-align: center; /* Center-align the content for calendar cells */
+            vertical-align: top; /* Align content to the top of the cell */
         }
 
         .calendar-table th {
             background-color: #f4f4f4;
             font-weight: bold;
-            min-width: 120px; /* Ensure columns are spaced out */
         }
 
         .calendar-table td {
-            min-width: 120px; /* Ensure consistency with column width */
-        }
-
-        .calendar-table tr:hover {
-            background-color: #f1f1f1; /* Highlight row on hover */
+            height: 100px; /* Ensure consistent height for calendar cells */
+            min-width: 120px; /* Ensure consistent width */
         }
 
         /* Highlight key harvest days */
