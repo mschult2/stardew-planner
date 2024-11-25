@@ -93,7 +93,6 @@
                                 <td class="@(PlantingDays[day] && crop != null ? "harvest-day" : "")">
                                     <div><strong>Day @day</strong></div>
                                     <div>@(crop != null ? crop.name : "No Crop")</div>
-                                    @* <div>@(PlantingDays[day] && crop != null ? "⭐ Yes ⭐" : "No")</div> *@
                                 </td>
                             }
                         </tr>
@@ -114,43 +113,42 @@
         border-collapse: collapse;
     }
 
-        .calendar-table th, .calendar-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: center; /* Center-align the content for calendar cells */
-            vertical-align: top; /* Align content to the top of the cell */
-        }
+    .calendar-table th, .calendar-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center; /* Center-align the content for calendar cells */
+        vertical-align: top; /* Align content to the top of the cell */
+    }
 
-        .calendar-table th {
-            background-color: #f4f4f4;
-            font-weight: bold;
-        }
+    .calendar-table th {
+        background-color: #f4f4f4;
+        font-weight: bold;
+    }
 
-        .calendar-table td {
-            height: 100px; /* Ensure consistent height for calendar cells */
-            min-width: 120px; /* Ensure consistent width */
-        }
+    .calendar-table td {
+        height: 100px; /* Ensure consistent height for calendar cells */
+        min-width: 120px; /* Ensure consistent width */
+    }
 
-        /* Highlight key harvest days */
-        .calendar-table .harvest-day {
-            background-color: #39ff14; /* Neon green for key harvest days */
-        }
+    /* Highlight key harvest days */
+    .calendar-table .harvest-day {
+        background-color: #39ff14; /* Neon green for key harvest days */
+    }
 
-         /* Delete All button style */
-         .delete-all-btn {
-             margin-top: 10px;
-             background-color: #ff4d4d;
-             color: white;
-             border: none;
-             padding: 10px 15px;
-             cursor: pointer;
-             border-radius: 5px;
-        }
+    /* Delete All button style */
+    .delete-all-btn {
+        margin-top: 10px;
+        background-color: #ff4d4d;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
 
-        
-        .delete-all-btn:hover {
-            background-color: #ff0000;
-        }
+    .delete-all-btn:hover {
+        background-color: #ff0000;
+    }
 </style>
 
 @code {
@@ -161,7 +159,7 @@
     private double NewCropBuyPrice;
     private double NewCropSellPrice;
 
-    // Crop list and other state
+    // Default crop list
     private List<Crop> Crops = new()
     {
         new Crop("Blueberry", 13, 4, 80, 150),
@@ -176,6 +174,13 @@
     private PlantSchedule Schedule;
     private bool[] PlantingDays;
     private const int NumDays = 28; // Stardew Valley season length
+
+    protected override void OnInitialized()
+    {
+        // Automatically generate the calendar when the page loads
+        if (Crops != null && Crops.Count > 0)
+            GenerateCalendar();
+    }
 
     // Add a new crop to the list
     private void AddCrop()
@@ -208,6 +213,8 @@
     private void DeleteAllCrops()
     {
         Crops.Clear();
+        Schedule = null; // Clear the schedule
+        PlantingDays = null; // Clear planting days
     }
 
     // Generate the planting schedule
