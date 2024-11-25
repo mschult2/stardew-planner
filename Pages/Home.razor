@@ -18,7 +18,7 @@
         </label>
         <br />
         <label>
-            Days Between Harvests (0 for single harvest):
+            Days Between Harvests (-1 for single harvest):
             <input type="number" @bind="NewCropYieldRate" />
         </label>
         <br />
@@ -62,19 +62,23 @@
     <div>
         @if (Schedule != null)
         {
-            <table border="1">
+            <table class="calendar-table">
                 <thead>
                     <tr>
                         <th>Day</th>
                         <th>Crop to Plant</th>
-                        <th>Payday</th>
+                        <th>Harvest Payday</th>
                     </tr>
                 </thead>
                 <tbody>
                     @for (int day = 1; day <= NumDays; day++)
                     {
                         var crop = Schedule.GetCrop(day);
-                        <tr>
+
+                        string className = PlantingDays[day] && crop != null ? "harvest-day" : "";
+                        Console.WriteLine($"Day {day}: class: {className}");
+
+                        <tr class="@(PlantingDays[day] && crop != null ? "harvest-day" : "")">
                             <td>@day</td>
                             <td>@(crop != null ? crop.name : "No Crop")</td>
                             <td>@(PlantingDays[day] && crop != null ? "⭐ Yes ⭐" : "No")</td>
@@ -89,6 +93,38 @@
         }
     </div>
 </div>
+
+<style>
+    .calendar-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .calendar-table th, .calendar-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .calendar-table th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+            min-width: 120px; /* Ensure columns are spaced out */
+        }
+
+        .calendar-table td {
+            min-width: 120px; /* Ensure consistency with column width */
+        }
+
+        .calendar-table tr:hover {
+            background-color: #f1f1f1; /* Highlight row on hover */
+        }
+
+        /* Highlight key harvest days */
+        .calendar-table .harvest-day {
+            background-color: #39ff14; /* Neon green for key harvest days */
+        }
+</style>
 
 @code {
     // Input properties for a new crop
