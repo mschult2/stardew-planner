@@ -1,12 +1,5 @@
 ﻿@page "/"
-
 <PageTitle>Home</PageTitle>
-
-@* <h1>Hello, world!</h1>
-
-Welcome to your new app. *@
-
-@page "/stardew-schedule"
 @using StardewCropCalculatorLibrary
 
 <h3>Stardew Valley Schedule Generator</h3>
@@ -25,7 +18,7 @@ Welcome to your new app. *@
         </label>
         <br />
         <label>
-            Days Between Harvests (-1 for single harvest):
+            Days Between Harvests (0 for single harvest):
             <input type="number" @bind="NewCropYieldRate" />
         </label>
         <br />
@@ -45,37 +38,47 @@ Welcome to your new app. *@
 
 <div>
     <h4>Crops</h4>
-    <ul>
-        @foreach (var crop in Crops)
-        {
-            <li>@crop.name (Matures: @crop.timeToMaturity days, Yield Rate: @crop.yieldRate days)</li>
-        }
-    </ul>
+    @if (Crops.Any())
+    {
+        <ul>
+            @foreach (var crop in Crops)
+            {
+                <li>
+                    @crop.name (Matures: @crop.timeToMaturity days, Yield Rate: @crop.yieldRate days)
+                    <button type="button" @onclick="(() => DeleteCrop(crop))">Delete</button>
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p>No crops added yet. Add crops to see them here.</p>
+    }
 </div>
 
 <div>
     <h4>Generated Calendar</h4>
     <button @onclick="GenerateCalendar">Generate Schedule</button>
     <div>
-        @if (PlantingDays != null && PlantingDays.Any(x => x))
+        @if (Schedule != null)
         {
             <table border="1">
                 <thead>
                     <tr>
                         <th>Day</th>
-                        <th>Task</th>
+                        <th>Crop to Plant</th>
+                        <th>Payday</th>
                     </tr>
                 </thead>
                 <tbody>
                     @for (int day = 1; day <= NumDays; day++)
                     {
-                        if (PlantingDays[day])
-                        {
-                            <tr>
-                                <td>Day @day</td>
-                                <td>Plant @Schedule.GetCrop(day)?.name</td>
-                            </tr>
-                        }
+                        var crop = Schedule.GetCrop(day);
+                        <tr>
+                            <td>@day</td>
+                            <td>@(crop != null ? crop.name : "No Crop")</td>
+                            <td>@(PlantingDays[day] && crop != null ? "⭐ Yes ⭐" : "No")</td>
+                        </tr>
                     }
                 </tbody>
             </table>
@@ -99,14 +102,19 @@ Welcome to your new app. *@
     private List<Crop> Crops = new();
     private PlantSchedule Schedule;
     private bool[] PlantingDays;
-    private const int NumDays = 30; // Stardew Valley season length
+    private const int NumDays = 28; // Stardew Valley season length
 
     // Add a new crop to the list
     private void AddCrop()
     {
         if (!string.IsNullOrWhiteSpace(NewCropName))
         {
-            Crops.Add(new Crop(NewCropName, NewCropTimeToMaturity, NewCropYieldRate, NewCropBuyPrice, NewCropSellPrice));
+            int processedYieldRate = NewCropYieldRate;
+
+            if (NewCropYieldRate <= 0)
+                processedYieldRate = 1000;
+
+            Crops.Add(new Crop(NewCropName, NewCropTimeToMaturity, processedYieldRate, NewCropBuyPrice, NewCropSellPrice));
 
             // Clear the form fields
             NewCropName = string.Empty;
@@ -115,6 +123,12 @@ Welcome to your new app. *@
             NewCropBuyPrice = 0;
             NewCropSellPrice = 0;
         }
+    }
+
+    // Delete a crop from the list
+    private void DeleteCrop(Crop crop)
+    {
+        Crops.Remove(crop);
     }
 
     // Generate the planting schedule
@@ -131,7 +145,16 @@ Welcome to your new app. *@
         factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
         Schedule = bestSchedule;
 
-        // Get the planting days
-        PlantingDays = factory.GetPlantingDays();
+        // Get the planting days with bounds checks
+        try
+        {
+            PlantingDays = factory.GetPlantingDays();
+        }
+        catch (IndexOutOfRangeException ex)
+        {
+            // Log or handle the error as needed
+            Console.WriteLine($"Error generating planting days: {ex.Message}");
+            PlantingDays = new bool[NumDays + 1]; // Ensure PlantingDays is valid even in error cases
+        }
     }
 }
