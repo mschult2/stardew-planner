@@ -2,7 +2,12 @@
 <PageTitle>Stardew Crop Planner</PageTitle>
 @using StardewCropCalculatorLibrary
 
-<h3>Stardew Valley Schedule Generator</h3>
+<h3>Stardew Valley Planting Schedule Generator</h3>
+
+<div>
+    This website computes the most profitable crop to plant on each day. Just enter the crops you have available to you and press "Generate Calendar".
+</div>
+<br />
 
 <div>
     <h4>Add Crop</h4>
@@ -36,6 +41,8 @@
     </form>
 </div>
 
+<br />
+
 <div>
     <h4>Crops</h4>
     @if (Crops.Any())
@@ -57,9 +64,11 @@
     }
 </div>
 
+<br />
+
 <div>
-    <h4>Generated Calendar</h4>
-    <button @onclick="GenerateCalendar">Generate Schedule</button>
+    <h4>Planting Calendar</h4>
+    <button @onclick="GenerateCalendar">Generate Calendar</button>
     <div>
         <p></p>
         <p>Planting days are highlighted in green. On these days you should have gold from the previous day's harvest, so ideally spend all of it on the indicated crop's seeds and plant them.</p>
