@@ -1,0 +1,137 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+@* <h1>Hello, world!</h1>
+
+Welcome to your new app. *@
+
+@page "/stardew-schedule"
+@using StardewCropCalculatorLibrary
+
+<h3>Stardew Valley Schedule Generator</h3>
+
+<div>
+    <h4>Add Crop</h4>
+    <form>
+        <label>
+            Crop Name:
+            <input type="text" @bind="NewCropName" />
+        </label>
+        <br />
+        <label>
+            Days to Maturity:
+            <input type="number" @bind="NewCropTimeToMaturity" />
+        </label>
+        <br />
+        <label>
+            Days Between Harvests (-1 for single harvest):
+            <input type="number" @bind="NewCropYieldRate" />
+        </label>
+        <br />
+        <label>
+            Buy Price:
+            <input type="number" @bind="NewCropBuyPrice" />
+        </label>
+        <br />
+        <label>
+            Sell Price:
+            <input type="number" @bind="NewCropSellPrice" />
+        </label>
+        <br />
+        <button type="button" @onclick="AddCrop">Add Crop</button>
+    </form>
+</div>
+
+<div>
+    <h4>Crops</h4>
+    <ul>
+        @foreach (var crop in Crops)
+        {
+            <li>@crop.name (Matures: @crop.timeToMaturity days, Yield Rate: @crop.yieldRate days)</li>
+        }
+    </ul>
+</div>
+
+<div>
+    <h4>Generated Calendar</h4>
+    <button @onclick="GenerateCalendar">Generate Schedule</button>
+    <div>
+        @if (PlantingDays != null && PlantingDays.Any(x => x))
+        {
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th>Task</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int day = 1; day <= NumDays; day++)
+                    {
+                        if (PlantingDays[day])
+                        {
+                            <tr>
+                                <td>Day @day</td>
+                                <td>Plant @Schedule.GetCrop(day)?.name</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No schedule generated yet. Add crops and click "Generate Schedule."</p>
+        }
+    </div>
+</div>
+
+@code {
+    // Input properties for a new crop
+    private string NewCropName = string.Empty;
+    private int NewCropTimeToMaturity;
+    private int NewCropYieldRate;
+    private double NewCropBuyPrice;
+    private double NewCropSellPrice;
+
+    // Crop list and other state
+    private List<Crop> Crops = new();
+    private PlantSchedule Schedule;
+    private bool[] PlantingDays;
+    private const int NumDays = 30; // Stardew Valley season length
+
+    // Add a new crop to the list
+    private void AddCrop()
+    {
+        if (!string.IsNullOrWhiteSpace(NewCropName))
+        {
+            Crops.Add(new Crop(NewCropName, NewCropTimeToMaturity, NewCropYieldRate, NewCropBuyPrice, NewCropSellPrice));
+
+            // Clear the form fields
+            NewCropName = string.Empty;
+            NewCropTimeToMaturity = 0;
+            NewCropYieldRate = 0;
+            NewCropBuyPrice = 0;
+            NewCropSellPrice = 0;
+        }
+    }
+
+    // Generate the planting schedule
+    private void GenerateCalendar()
+    {
+        if (!Crops.Any())
+        {
+            return; // No crops to calculate schedule
+        }
+
+        var factory = new PlantScheduleFactory(NumDays);
+
+        // Calculate the best schedule
+        factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
+        Schedule = bestSchedule;
+
+        // Get the planting days
+        PlantingDays = factory.GetPlantingDays();
+    }
+}
