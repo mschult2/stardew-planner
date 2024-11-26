@@ -23,8 +23,9 @@
         </label>
         <br />
         <label>
-            Days Between Harvests (leave 0 for single harvest):
+            Days Between Harvests:
             <input type="number" @bind="NewCropYieldRate" />
+             (leave 0 for single harvest)
         </label>
         <br />
         <label>
@@ -33,8 +34,9 @@
         </label>
         <br />
         <label>
-            Sell Price:
+            Total Sell Price:
             <input type="number" @bind="NewCropSellPrice" />
+            (account for multiple yield)
         </label>
         <br />
         <button type="button" @onclick="AddCrop">Add Crop</button>
@@ -51,7 +53,10 @@
             @foreach (var crop in Crops)
             {
                 <li>
-                    @crop.name (Matures: @crop.timeToMaturity days, Yield Rate: @crop.yieldRate days)
+                    @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g@(
+            crop.yieldRate > 0 && crop.yieldRate < 1000
+            ? $", Yield Rate: {crop.yieldRate} days"
+            : ", Yield Rate: N/A"))
                     <button type="button" @onclick="(() => DeleteCrop(crop))">Delete</button>
                 </li>
             }
@@ -178,7 +183,8 @@
         new Crop("Tomato", 11, 4, 50, 60),
         new Crop("Radish", 6, 1000, 40, 90),
         new Crop("Poppy", 7, 1000, 100, 140),
-        new Crop("Spangle", 8, 1000, 50, 90)
+        new Crop("Spangle", 8, 1000, 50, 90),
+        new Crop("Starfruit", 13, 1000, 400, 750)
     };
     private PlantSchedule Schedule;
     private bool[] PlantingDays;
