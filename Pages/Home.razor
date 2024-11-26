@@ -10,7 +10,6 @@
 <br />
 
 <div>
-    @* <h4>Settings</h4> *@
     <form>
         <label>
             Available Gold:
@@ -91,7 +90,7 @@
 <br />
 
 <div>
-    <h4>Investment Multiplier</h4>
+    <h4>Conclusion</h4>
     @if (Schedule != null)
     {
         <p>Your investment multiplier is: <strong>@InvestmentMultiplier.ToString("F1")</strong></p>
@@ -99,6 +98,10 @@
         @if (Profit > 0)
         {
             <p>Your profit is: <strong>@Profit.ToString("F0") gold</strong></p>
+        }
+        else
+        {
+            <p>Your profit is: <strong>??</strong> (to see this, set Available Gold)</p>
         }
 
     }
@@ -288,14 +291,6 @@
         InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
         Schedule = bestSchedule;
 
-        // Either gold is the limiting factor (normal), or tiles are the limiting factor (special case).
-        var tileLimited = false;
-        if (!tileLimited)
-        {
-            if (AvailableGold > 0)
-                Profit = (AvailableGold * InvestmentMultiplier) - AvailableGold;
-        }
-
         // Get the planting days with bounds checks
         try
         {
@@ -306,6 +301,45 @@
             // Log or handle the error as needed
             Console.WriteLine($"Error generating planting days: {ex.Message}");
             PlantingDays = new bool[NumDays + 1]; // Ensure PlantingDays is valid even in error cases
+        }
+
+        // Either gold is the limiting factor (normal), or tiles are the limiting factor (special case).
+        var tileLimited = false;
+
+        // Calculte flat profit, with gold as the limiting factor (standard case).
+        // Note that we can't just use the investment multiplier, because we're not allowed to make fractional investments. This unused remainder matters if we start with a small amount of gold.
+        if (!tileLimited)
+        {
+            var curGold = AvailableGold;
+
+            Console.WriteLine($"\nWallet: {curGold}g\n");
+
+            for (int i = 1; i <= Schedule.MaxDays; ++i)
+            {
+                if (!PlantingDays[i])
+                    continue;
+
+                List<Crop> cropList = Schedule.GetCrops(i);
+
+                if (cropList != null && cropList.Count > 0)
+                {
+                    var curCrop = cropList[0];
+
+                    var unitsBought = (int) (curGold / curCrop.buyPrice);
+                    var moneySpent = unitsBought * curCrop.buyPrice;
+                    curGold %= curCrop.buyPrice;
+
+                    Console.WriteLine($"Day {i}:\n  Planted {unitsBought} {curCrop.name} for {moneySpent}g. Wallet: {curGold}g");
+
+                    var moneyReceived = unitsBought * curCrop.sellPrice;
+                    curGold += moneyReceived;
+
+                    Console.WriteLine($"  Sold {unitsBought} {curCrop.name} for {moneyReceived}g. Wallet: {curGold}g");
+                }
+            }
+        
+            if (AvailableGold > 0)
+                Profit = curGold - AvailableGold;
         }
     }
 }
