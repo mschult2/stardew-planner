@@ -10,6 +10,25 @@
 <br />
 
 <div>
+    @* <h4>Settings</h4> *@
+    <form>
+        <label>
+            Available Gold:
+            <input type="number" @bind="AvailableGold" />
+            (0 means unlimited)
+        </label>
+        <br />
+        <label>
+            Available Tiles:
+            <input type="number" @bind="AvailableTiles" />
+            (0 means unlimited)
+        </label>
+    </form>
+</div>
+
+<br />
+
+<div>
     <h4>Add Crop</h4>
     <form>
         <label>
@@ -75,7 +94,13 @@
     <h4>Investment Multiplier</h4>
     @if (Schedule != null)
     {
-        <p>Your investment multiplier is: <strong>@InvestmentMultiplier.ToString("F2")</strong></p>
+        <p>Your investment multiplier is: <strong>@InvestmentMultiplier.ToString("F1")</strong></p>
+
+        @if (Profit > 0)
+        {
+            <p>Your profit is: <strong>@Profit.ToString("F0") gold</strong></p>
+        }
+
     }
     else
     {
@@ -185,6 +210,10 @@
     private double NewCropBuyPrice;
     private double NewCropSellPrice;
 
+    // Settings for gold and tiles
+    private double AvailableGold = 0;
+    private int AvailableTiles = 0;
+
     // Default crop list
     private List<Crop> Crops = new()
     {
@@ -201,7 +230,8 @@
     private PlantSchedule Schedule;
     private bool[] PlantingDays;
     private const int NumDays = 28; // Stardew Valley season length
-    private double InvestmentMultiplier; // Added field to store investment multiplier
+    private double InvestmentMultiplier;
+    private double Profit;
 
     protected override void OnInitialized()
     {
@@ -255,9 +285,16 @@
 
         var factory = new PlantScheduleFactory(NumDays);
 
-        // Calculate the best schedule
         InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
         Schedule = bestSchedule;
+
+        // Either gold is the limiting factor (normal), or tiles are the limiting factor (special case).
+        var tileLimited = false;
+        if (!tileLimited)
+        {
+            if (AvailableGold > 0)
+                Profit = (AvailableGold * InvestmentMultiplier) - AvailableGold;
+        }
 
         // Get the planting days with bounds checks
         try
