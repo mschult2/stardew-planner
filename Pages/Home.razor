@@ -25,7 +25,7 @@
         <label>
             Days Between Harvests:
             <input type="number" @bind="NewCropYieldRate" />
-             (leave 0 for single harvest)
+            (leave 0 for single harvest)
         </label>
         <br />
         <label>
@@ -70,6 +70,18 @@
 </div>
 
 <br />
+
+<div>
+    <h4>Investment Multiplier</h4>
+    @if (Schedule != null)
+    {
+        <p>Your investment multiplier is: <strong>@InvestmentMultiplier.ToString("F2")</strong></p>
+    }
+    else
+    {
+        <p>No schedule generated yet. Add crops and click "Generate Schedule."</p>
+    }
+</div>
 
 <div>
     <h4>Planting Calendar</h4>
@@ -127,27 +139,27 @@
         border-collapse: collapse;
     }
 
-    .calendar-table th, .calendar-table td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: center; /* Center-align the content for calendar cells */
-        vertical-align: top; /* Align content to the top of the cell */
-    }
+        .calendar-table th, .calendar-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center; /* Center-align the content for calendar cells */
+            vertical-align: top; /* Align content to the top of the cell */
+        }
 
-    .calendar-table th {
-        background-color: #f4f4f4;
-        font-weight: bold;
-    }
+        .calendar-table th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+        }
 
-    .calendar-table td {
-        height: 100px; /* Ensure consistent height for calendar cells */
-        min-width: 120px; /* Ensure consistent width */
-    }
+        .calendar-table td {
+            height: 100px; /* Ensure consistent height for calendar cells */
+            min-width: 120px; /* Ensure consistent width */
+        }
 
-    /* Highlight key harvest days */
-    .calendar-table .harvest-day {
-        background-color: #39ff14; /* Neon green for key harvest days */
-    }
+        /* Highlight key harvest days */
+        .calendar-table .harvest-day {
+            background-color: #39ff14; /* Neon green for key harvest days */
+        }
 
     /* Delete All button style */
     .delete-all-btn {
@@ -160,9 +172,9 @@
         border-radius: 5px;
     }
 
-    .delete-all-btn:hover {
-        background-color: #ff0000;
-    }
+        .delete-all-btn:hover {
+            background-color: #ff0000;
+        }
 </style>
 
 @code {
@@ -189,6 +201,7 @@
     private PlantSchedule Schedule;
     private bool[] PlantingDays;
     private const int NumDays = 28; // Stardew Valley season length
+    private double InvestmentMultiplier; // Added field to store investment multiplier
 
     protected override void OnInitialized()
     {
@@ -243,7 +256,7 @@
         var factory = new PlantScheduleFactory(NumDays);
 
         // Calculate the best schedule
-        factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
+        InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
         Schedule = bestSchedule;
 
         // Get the planting days with bounds checks
