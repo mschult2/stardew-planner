@@ -16,12 +16,12 @@
             <input type="number" @bind="AvailableGold" />
             (0 means unlimited)
         </label>
-        <br />
+@*         <br />
         <label>
             Available Tiles:
             <input type="number" @bind="AvailableTiles" />
             (0 means unlimited)
-        </label>
+        </label> *@
     </form>
 </div>
 
@@ -93,15 +93,15 @@
     <h4>Conclusion</h4>
     @if (Schedule != null)
     {
-        <p>Your investment multiplier is: <strong>@InvestmentMultiplier.ToString("F1")</strong></p>
+        <p>Your theoretical investment multiplier is: <strong>@InvestmentMultiplier.ToString("F1")</strong></p>
 
         @if (Profit > 0)
         {
-            <p>Your profit is: <strong>@Profit.ToString("F0") gold</strong></p>
+            <p>Your actual profit is: <strong>@Profit.ToString("F0") gold</strong></p>
         }
         else
         {
-            <p>Your profit is: <strong>??</strong> (to see this, set Available Gold)</p>
+            <p>Your actual profit is: <strong>??</strong> (to see this, set Available Gold)</p>
         }
 
     }
@@ -117,7 +117,7 @@
     <div>
         <p></p>
         <p>Planting days are highlighted in green. On these days you should have gold from the previous day's harvest, so ideally spend all of it on the indicated crop's seeds and plant them.</p>
-        <p>An optimal crop-to-plant is indicated for the other days too, in case you obtain some extra gold on these days.</p>
+        <p>An optimal planting choice is indicated for the other days too, in case you acquire some extra gold.</p>
     </div>
 
     <div>
@@ -143,10 +143,12 @@
                             {
                                 int day = week * 7 + dayOfWeek;
                                 var crop = Schedule.GetCrop(day);
+                                var plantingDetails = ScheduleDetails != null ? ScheduleDetails[day] : null;
 
                                 <td class="@(PlantingDays[day] && crop != null ? "harvest-day" : "")">
                                     <div><strong>Day @day</strong></div>
                                     <div>@(crop != null ? crop.name : "No Crop")</div>
+                                    <div>@(plantingDetails != null && plantingDetails.numberToPlant != 0 ? $"(plant {plantingDetails.numberToPlant} seeds)" : "")</div>
                                 </td>
                             }
                         </tr>
@@ -214,7 +216,7 @@
     private double NewCropSellPrice;
 
     // Settings for gold and tiles
-    private double AvailableGold = 0;
+    private double AvailableGold = 400;
     private int AvailableTiles = 0;
 
     // Default crop list
@@ -231,6 +233,8 @@
         new Crop("Starfruit", 13, 1000, 400, 750)
     };
     private PlantSchedule Schedule;
+    private DayDetails[] ScheduleDetails;
+
     private bool[] PlantingDays;
     private const int NumDays = 28; // Stardew Valley season length
     private double InvestmentMultiplier;
@@ -275,6 +279,7 @@
     {
         Crops.Clear();
         Schedule = null; // Clear the schedule
+        ScheduleDetails = null;
         PlantingDays = null; // Clear planting days
     }
 
@@ -290,6 +295,7 @@
 
         InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
         Schedule = bestSchedule;
+        ScheduleDetails = new DayDetails[Schedule.MaxDays + 1];
 
         // Get the planting days with bounds checks
         try
@@ -307,39 +313,103 @@
         var tileLimited = false;
 
         // Calculte flat profit, with gold as the limiting factor (standard case).
-        // Note that we can't just use the investment multiplier, because we're not allowed to make fractional investments. This unused remainder matters if we start with a small amount of gold.
-        if (!tileLimited)
+        // Note: we can't just use the investment multiplier, because we're not allowed to make fractional investments. This unused remainder matters if we start with a small amount of gold.
+        if (!tileLimited && AvailableGold > 0)
         {
             var curGold = AvailableGold;
 
-            Console.WriteLine($"\nWallet: {curGold}g\n");
+            List<Plant> persistentPlants = new();
+
+            // Console.WriteLine($"\nWallet: {curGold}g\n");
 
             for (int i = 1; i <= Schedule.MaxDays; ++i)
             {
-                if (!PlantingDays[i])
-                    continue;
-
-                List<Crop> cropList = Schedule.GetCrops(i);
-
-                if (cropList != null && cropList.Count > 0)
+                if (PlantingDays[i])
                 {
-                    var curCrop = cropList[0];
+                    // Buying Day
+                    List<Crop> cropList = Schedule.GetCrops(i);
 
-                    var unitsBought = (int) (curGold / curCrop.buyPrice);
-                    var moneySpent = unitsBought * curCrop.buyPrice;
-                    curGold %= curCrop.buyPrice;
+                    if (cropList != null && cropList.Count > 0)
+                    {
+                        var curCrop = cropList[0];
 
-                    Console.WriteLine($"Day {i}:\n  Planted {unitsBought} {curCrop.name} for {moneySpent}g. Wallet: {curGold}g");
+                        // Buy
+                        var unitsPlanted = (int)(curGold / curCrop.buyPrice);
+                        var moneySpent = unitsPlanted * curCrop.buyPrice;
+                        curGold %= curCrop.buyPrice;
 
-                    var moneyReceived = unitsBought * curCrop.sellPrice;
-                    curGold += moneyReceived;
+                        // Console.WriteLine($"BUY DAY {i}: Planted {unitsPlanted} {curCrop.name} for {moneySpent}g. Wallet: {curGold}g");
 
-                    Console.WriteLine($"  Sold {unitsBought} {curCrop.name} for {moneyReceived}g. Wallet: {curGold}g");
+                        // Save recurring crop for next time
+                        for (int j = 0; j < unitsPlanted; ++j)
+                            persistentPlants.Add(new Plant(curCrop, i, Schedule.MaxDays, curCrop.timeToMaturity, curCrop.yieldRate));
+
+                        ScheduleDetails[i] = new DayDetails() { numberToPlant = unitsPlanted };
+                    }
+                }
+                else
+                {
+                    // Selling Day
+                    double moneyReceived = 0;
+                    int unitsSold = 0;
+                    foreach (var persistentPlant in persistentPlants)
+                    {
+                        if (persistentPlant.HarvestDays.Contains(i))
+                        {
+                            moneyReceived += persistentPlant.Crop.sellPrice;
+                            ++unitsSold;
+                        }
+                    }
+
+                    if (moneyReceived > 0)
+                    {
+                        curGold += moneyReceived;
+                        // Console.WriteLine($"SELL DAY {i}: Sold {unitsSold} plants for {moneyReceived}g. Wallet: {curGold}g");
+                    }
                 }
             }
-        
+
+
+
+
+
             if (AvailableGold > 0)
                 Profit = curGold - AvailableGold;
         }
+    }
+
+    /// <summary>
+    /// A single instance of a plant in the flat profit calculator simulation.
+    /// </summary>
+    public class Plant
+    {
+        public Crop Crop;
+        public List<int> HarvestDays;
+
+        public Plant(Crop crop, int dayItWasPlanted, int maxDays, int daysToMaturity, int daysBetweenHarvests)
+        {
+            Crop = crop;
+
+            HarvestDays = new();
+
+            int harvestDate = dayItWasPlanted + daysToMaturity;
+            HarvestDays.Add(harvestDate);
+
+            while ((harvestDate + daysBetweenHarvests) <= maxDays)
+            {
+                harvestDate += daysBetweenHarvests;
+                HarvestDays.Add(harvestDate);
+            }
+        }
+
+        public override string ToString()
+        {
+            return $"{Crop.name}: blooms on {string.Join(", ", HarvestDays.ToArray())}";
+        }
+    }
+
+    public class DayDetails
+    {
+        public int numberToPlant;
     }
 }
