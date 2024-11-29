@@ -15,6 +15,8 @@ namespace StardewCropCalculatorLibrary
         public double buyPrice { get; set; }
         public double sellPrice { get; set; }
 
+        /// <summary> Tile profitability index. How much money a single plant makes you daily. </summary>
+        public int TPI => (int)(((NumHarvests(1, 28) * sellPrice) - buyPrice) / timeToMaturity);
 
         /// <summary>
         /// 
@@ -70,6 +72,11 @@ namespace StardewCropCalculatorLibrary
                 numHarvests = (int)((maxDays - dayPlanted - timeToMaturity + yieldRate) / yieldRate); // rounds to floor
 
             return numHarvests < 0 ? 0 : numHarvests;
+        }
+
+        public override string ToString()
+        {
+            return name;
         }
     }
 }

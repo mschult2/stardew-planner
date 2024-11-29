@@ -10,18 +10,17 @@
 <br />
 
 <div>
-    <form>
-        <label>
-            Available Gold:
+    <form class="aligned-form">
+        <div class="form-row">
+            <label>Available Gold:</label>
             <input type="number" @bind="AvailableGold" />
-            (0 means unlimited)
-        </label>
-        <br />
-        <label>
-            Available Tiles:
+            <span>(0 means unlimited)</span>
+        </div>
+        <div class="form-row">
+            <label>Available Field Tiles:</label>
             <input type="number" @bind="AvailableTiles" />
-            (0 means unlimited)
-        </label>
+            <span>(0 means unlimited)</span>
+        </div>
     </form>
 </div>
 
@@ -29,37 +28,35 @@
 
 <div>
     <h4>Add Crop</h4>
-    <form>
-        <label>
-            Crop Name:
+    <form class="aligned-form">
+        <div class="form-row">
+            <label>Crop Name:</label>
             <input type="text" @bind="NewCropName" />
-        </label>
-        <br />
-        <label>
-            Days to Maturity:
+        </div>
+        <div class="form-row">
+            <label>Days to Maturity:</label>
             <input type="number" @bind="NewCropTimeToMaturity" />
-        </label>
-        <br />
-        <label>
-            Days Between Harvests:
+        </div>
+        <div class="form-row">
+            <label>Days Between Harvests:</label>
             <input type="number" @bind="NewCropYieldRate" />
-            (leave 0 for single harvest)
-        </label>
-        <br />
-        <label>
-            Buy Price:
+            <span>(leave 0 for single harvest)</span>
+        </div>
+        <div class="form-row">
+            <label>Buy Price:</label>
             <input type="number" @bind="NewCropBuyPrice" />
-        </label>
-        <br />
-        <label>
-            Total Sell Price:
+        </div>
+        <div class="form-row">
+            <label>Total Sell Price:</label>
             <input type="number" @bind="NewCropSellPrice" />
-            (account for multiple yield)
-        </label>
-        <br />
-        <button type="button" @onclick="AddCrop">Add Crop</button>
+            <span>(remember to account for multiple yields in one harvest)</span>
+        </div>
     </form>
+    <br />
+    <button type="button" @onclick="AddCrop">Add Crop</button>
 </div>
+
+
 
 <br />
 
@@ -74,7 +71,8 @@
                     @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g@(
             crop.yieldRate > 0 && crop.yieldRate < 1000
             ? $", Yield Rate: {crop.yieldRate} days"
-            : ", Yield Rate: N/A"))
+            : ", Yield Rate: N/A")
+                    , Profit Index: @crop.TPI)
                     <button type="button" @onclick="(() => DeleteCrop(crop))">Delete</button>
                 </li>
             }
@@ -93,15 +91,18 @@
     <h4>Conclusion</h4>
     @if (Schedule != null)
     {
-        <p>Your theoretical investment multiplier is: <strong>@InvestmentMultiplier.ToString("F1")</strong></p>
-
-        @if (Profit > 0)
+        @if (Profit >= 0)
         {
-            <p>Your actual profit is: <strong>@Profit.ToString("F0") gold</strong></p>
+            <p>Your actual Profit is: <strong>@Profit.ToString("N0") gold</strong></p>
         }
         else
         {
-            <p>Your actual profit is: <strong>??</strong> (to see this, set Available Gold)</p>
+            <p>Your actual Profit is: <strong>??</strong> (to see this, set Available Gold)</p>
+        }
+
+        @if (!TileLimited)
+        {
+            <p>Your theoretical Investment Multiple is: <strong>@InvestmentMultiplier.ToString("F1")x</strong></p>
         }
 
     }
@@ -116,7 +117,8 @@
     <button @onclick="GenerateCalendar">Generate Calendar</button>
     <div>
         <p></p>
-        <p>Planting days are highlighted in green. On these days you should have gold from the previous day's harvest, assuming you're gold-limited. If you're space-limited, then you'll have available tiles from the current day's harvest.</p>
+
+        <p>This is the planting schedule, with planting days highlighted in green. Harvest days are also marked. Planting days follow harvest days if you're gold-limited, but they fall on the same day if you're tile-limited.</p>
         <p>An optimal planting choice is indicated for the other days too, in case you acquire some extra gold.</p>
     </div>
 
@@ -142,25 +144,40 @@
                             @for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) // 7 days in a week
                             {
                                 int day = week * 7 + dayOfWeek;
-                                var crop = Schedule.GetCrop(day);
-                                var plantingDetails = ScheduleDetails != null ? ScheduleDetails[day] : null;
+                                var crops = Schedule.GetCrops(day);
+                                var plantingDetails = ScheduleDetails != null && ScheduleDetails.Length > day ? ScheduleDetails[day] : null;
+                                var plantingDay = PlantingDays[day] && crops != null && crops.Count > 0;
 
-                                // Determine the class for the cell
-                                string cellClass = "";
-                                bool plantingDay = PlantingDays[day] && crop != null;
-                                bool harvestDay = HarvestDays[day];
-
-                                if (plantingDay && harvestDay)
-                                    cellClass = "plant-and-harvest-day"; // Both planting and harvest
-                                else if (plantingDay)
-                                    cellClass = "planting-day"; // Planting only
-                                else if (harvestDay)
-                                    cellClass = "harvest-day"; // Harvest only
+                                // Determine the class for planting day
+                                string cellClass = plantingDay ? "planting-day" : "";
 
                                 <td class="@cellClass">
-                                    <div><strong>Day @day</strong></div>
-                                    <div>@(crop != null ? crop.name : "No Crop")</div>
-                                    <div>@(plantingDetails != null && plantingDetails.numberToPlant != 0 ? $"(plant {plantingDetails.numberToPlant} seeds)" : "")</div>
+                                    <div style="position: relative;">
+                                        @if (HarvestDays[day])
+                                        {
+                                            <span class="harvest-marker">Harvest</span>
+                                        }
+                                        <div><strong>@($"Day {day}{(plantingDay ? " - Plant" : "")}")</strong></div>
+
+                                        @if (crops != null && crops.Count > 0)
+                                        {
+                                            @for (int cropIndex = 0; cropIndex < crops.Count; ++cropIndex)
+                                            {
+                                                @if (plantingDetails != null && plantingDetails.cropsNumberToPlant != null && plantingDetails.cropsNumberToPlant.Count > cropIndex && plantingDetails.cropsNumberToPlant[cropIndex] > 0)
+                                                {
+                                                    <div>@($"{crops[cropIndex]} ({plantingDetails.cropsNumberToPlant[cropIndex]})")</div>
+                                                }
+                                                else
+                                                {
+                                                    <div>@($"{crops[cropIndex]}")</div>
+                                                }
+                                            }
+                                        }
+                                @*         else
+                                        {
+                                            <div>No Crop</div>
+                                        } *@
+                                    </div>
                                 </td>
                             }
                         </tr>
@@ -174,6 +191,8 @@
         }
     </div>
 </div>
+
+<br />
 
 <style>
     .calendar-table {
@@ -194,7 +213,8 @@
         }
 
         .calendar-table td {
-            height: 100px; /* Ensure consistent height for calendar cells */
+            height: 180px; /* Ensure consistent height for calendar cells */
+            aspect-ratio: 1 / 1; /* Maintain a 1:1 width-to-height ratio */
             min-width: 120px; /* Ensure consistent width */
         }
 
@@ -203,15 +223,15 @@
             background-color: #39ff14; /* Neon green */
         }
 
-        /* Highlight harvest days */
-        .calendar-table .harvest-day {
-            background-color: #ffff99; /* Yellow */
-        }
-
-        /* Highlight days that are both planting and harvest */
-        .calendar-table .plant-and-harvest-day {
-            background-color: #ff9933; /* Orange */
-        }
+    /* Style for harvest marker */
+    .harvest-marker {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        font-size: 15px;
+        font-weight: bold;
+        color: #ff9933; /* Orange */
+    }
 
     /* Delete All button style */
     .delete-all-btn {
@@ -227,6 +247,42 @@
         .delete-all-btn:hover {
             background-color: #ff0000;
         }
+
+    /* Align form inputs and labels */
+    .aligned-form {
+        display: flex;
+        flex-direction: column; /* Stack each form row vertically */
+        gap: 15px; /* Space between rows */
+    }
+
+        .aligned-form .form-row {
+            display: flex;
+            align-items: center; /* Vertically align items */
+            gap: 10px; /* Space between label and input/span */
+        }
+
+        .aligned-form label {
+            min-width: 150px; /* Ensure consistent label width */
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .aligned-form input {
+            flex-grow: 1; /* Let input fields fill available space */
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            max-width: 300px; /* Prevent overly wide inputs */
+        }
+
+        .aligned-form span {
+            font-size: 0.9em;
+            color: #666;
+            white-space: nowrap; /* Prevent text from wrapping */
+        }
+
+
+
 </style>
 
 @code {
@@ -238,30 +294,55 @@
     private double NewCropSellPrice;
 
     // Settings for gold and tiles
-    private double AvailableGold = 400;
-    private int AvailableTiles = 0;
+    private double AvailableGold = 5000;
+    private int AvailableTiles = 100;
 
     // Default crop list
     private List<Crop> Crops = new()
     {
-        new Crop("Blueberry", 13, 4, 80, 150),
-        new Crop("Hot Pepper", 5, 3, 40, 40),
+        // // new Crop("Blueberry", 13, 4, 80, 150),
+        // // new Crop("Hot Pepper", 5, 3, 40, 40),
+        // // new Crop("Melon", 12, 1000, 80, 250),
+        // // new Crop("Hops", 11, 1, 60, 25),
+        // new Crop("Tomato", 11, 4, 50, 60),
+        // new Crop("Radish", 6, 1000, 40, 90),
+        // // new Crop("Poppy", 7, 1000, 100, 140),
+        // // new Crop("Spangle", 8, 1000, 50, 90),
+        // new Crop("Starfruit", 13, 1000, 400, 750),
+        // // new Crop("Wheat", 4, 1000, 10, 25),
+
+        // All temp crops!
+        // new Crop("Blueberry", 13, 4, 80, 150),
+        // new Crop("Hot Pepper", 5, 3, 40, 40),
         new Crop("Melon", 12, 1000, 80, 250),
-        new Crop("Hops", 11, 1, 60, 25),
-        new Crop("Tomato", 11, 4, 50, 60),
+        // new Crop("Hops", 11, 1, 60, 25),
+        // new Crop("Tomato", 11, 4, 50, 60),
         new Crop("Radish", 6, 1000, 40, 90),
         new Crop("Poppy", 7, 1000, 100, 140),
         new Crop("Spangle", 8, 1000, 50, 90),
-        new Crop("Starfruit", 13, 1000, 400, 750)
-    };
-    private PlantSchedule Schedule;
-    private DayDetails[] ScheduleDetails;
+        new Crop("Starfruit", 13, 1000, 400, 750),
+        new Crop("Wheat", 4, 1000, 10, 25),
 
-    private bool[] PlantingDays;
-    private bool[] HarvestDays;
+        // new Crop("Blueberry", 13, 4, 80, 150),
+        // new Crop("Hot Pepper", 5, 3, 40, 40),
+        // new Crop("Melon", 12, 1000, 80, 250),
+        // new Crop("Hops", 11, 1, 60, 25),
+        // new Crop("Tomato", 11, 4, 50, 60),
+        // new Crop("Radish", 6, 1000, 40, 90),
+        // new Crop("Poppy", 7, 1000, 100, 140),
+        // new Crop("Spangle", 8, 1000, 50, 90),
+        // new Crop("Starfruit", 13, 1000, 400, 750),
+        // new Crop("Wheat", 4, 1000, 10, 25),
+    };
+    private PlantSchedule Schedule = null;
+    private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
+
     private const int NumDays = 28; // Stardew Valley season length
+    private bool[] PlantingDays = new bool[NumDays + 1];
+    private bool[] HarvestDays = new bool[NumDays + 1];
     private double InvestmentMultiplier;
-    private double Profit;
+    private double Profit = -1;
+    private bool TileLimited;
 
     protected override void OnInitialized()
     {
@@ -302,196 +383,244 @@
     {
         Crops.Clear();
         Schedule = null; // Clear the schedule
-        ScheduleDetails = null;
-        PlantingDays = null; // Clear planting days
-        HarvestDays = null;
+        ScheduleDetails = new DayDetails[NumDays + 1];
+        PlantingDays = new bool[NumDays + 1];
+        HarvestDays = new bool[NumDays + 1];
+    }
+
+    private void ClearSchedule()
+    {
+        Schedule = new(NumDays); // Clear the schedule
+        ScheduleDetails = new DayDetails[NumDays + 1];
+        PlantingDays = new bool[NumDays + 1];
+        HarvestDays = new bool[NumDays + 1];
     }
 
     // Generate the planting schedule
     private void GenerateCalendar()
     {
-        if (!Crops.Any())
+        if (!Crops.Any() && AvailableTiles <= 0 && AvailableGold <= 0)
+            return;
+
+        var factory2 = new PlantScheduleFactory2(NumDays);
+
+        Profit = factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold, out PlantScheduleFactory2.GameStateCalendar calendar);
+
+        // Convert Calendar to Schedule
+        ClearSchedule();
+        if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
         {
-            return; // No crops to calculate schedule
-        }
-
-        var factory = new PlantScheduleFactory(NumDays);
-
-        InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
-        Schedule = bestSchedule;
-
-        // Get the planting days
-        try
-        {
-            PlantingDays = factory.GetPlantingDays();
-        }
-        catch (IndexOutOfRangeException ex)
-        {
-            // Log or handle the error as needed
-            Console.WriteLine($"Error generating planting days: {ex.Message}");
-            PlantingDays = new bool[NumDays + 1]; // Ensure PlantingDays is valid even in error cases
-        }
-
-        // Modify schedule if tile limit reached
-        ScheduleDetails = new DayDetails[Schedule.MaxDays + 1];
-        var tileLimited = factory.LimitSchedule(Crops, AvailableTiles, AvailableGold, Schedule, PlantingDays, ScheduleDetails);
-
-        HarvestDays = new bool[Schedule.MaxDays + 1];
-
-        // Unlimited: can't calculate profit
-        if (AvailableTiles <= 0 && AvailableGold <= 0)
-        {
-            Console.WriteLine("MODE: THEORETICAL");
-            Profit = 0;
-        }
-        // Gold-limited:
-        // -Calculate flat profit
-        // -Calculate ScheduleDetails
-        else if (!tileLimited)
-        {
-            Console.WriteLine("MODE: GOLD LIMITED");
-
-            var curGold = AvailableGold;
-
-            List<Plant> persistentPlants = new();
-
-            Console.WriteLine($"\nWallet: {curGold}g\n");
-
-            for (int i = 1; i <= Schedule.MaxDays; ++i)
+            Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
+            for (int day = 1; day <= 28; ++day)
             {
-                Console.WriteLine($"~~~ Day {i} ~~~");
+                var dayState = calendar.GameStates[day];
 
-                if (PlantingDays[i])
+                if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                 {
-                    Console.WriteLine($"  --> Planting Day");
+                    Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
 
+                    PlantingDays[day] = true;
 
-                    // Buying Day
-                    List<Crop> cropList = Schedule.GetCrops(i);
+                    ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
 
-                    if (cropList != null && cropList.Count > 0)
+                    foreach (var batch in dayState.Plants)
                     {
-                        var curCrop = cropList[0];
+                        Schedule.AddCrop(day, batch.CropType);
+                        ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
 
-                        // Buy
-                        var unitsPlanted = (int)(curGold / curCrop.buyPrice);
-                        var moneySpent = unitsPlanted * curCrop.buyPrice;
-                        curGold -= moneySpent;
-
-                        Console.WriteLine($"BUY DAY {i}: Planted {unitsPlanted} {curCrop.name} for {moneySpent}g. Wallet: {curGold}g");
-
-                        // Save recurring crop for next time
-                        for (int j = 0; j < unitsPlanted; ++j)
-                        {
-                            var plant = new Plant(curCrop, i, Schedule.MaxDays, curCrop.timeToMaturity, curCrop.yieldRate);
-                            persistentPlants.Add(plant);
-
-                            if (j == 0)
-                                Console.WriteLine($"    -> new {plant.Crop.name} will be harvested on: {string.Join(", ", plant.HarvestDays.ToArray())}");
-
-                        }
-
-                        ScheduleDetails[i] = new DayDetails() { numberToPlant = unitsPlanted };
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"  --> Non-planting Day");
-
-                    // Selling Day
-                    // Can't occur on buying day since we're gold-limited, and so won't have gold until the day after a sale
-                    double moneyReceived = 0;
-                    int unitsSold = 0;
-                    foreach (var persistentPlant in persistentPlants)
-                    {
-                        if (persistentPlant.HarvestDays.Contains(i))
-                        {
-                            moneyReceived += persistentPlant.Crop.sellPrice;
-                            ++unitsSold;
-                            HarvestDays[i] = true;
-                        }
-                    }
-
-                    if (moneyReceived > 0)
-                    {
-                        curGold += moneyReceived;
-                        Console.WriteLine($"SELL DAY {i}: Sold {unitsSold} plants for {moneyReceived}g. Wallet: {curGold}g");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Normal day {i}");
+                        foreach (int harvestDay in batch.HarvestDays)
+                            HarvestDays[harvestDay] = true;
                     }
                 }
             }
-
-            Profit = curGold - AvailableGold;
         }
-        // Tile-limited
-        // -Calculate flat profit
-        // (ScheduleDetails provided)
-        else
-        {
-            Console.WriteLine("\nMODE: TILE LIMITED:\n");
 
-            Profit = 0;
+        // var factory = new PlantScheduleFactory(NumDays);
 
-            List<Plant> persistentPlants = new();
+        // InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
+        // Schedule = bestSchedule;
 
-            // Console.WriteLine($"\nWallet: {curGold}g\n");
+        // // Get the planting days
+        // try
+        // {
+        //     factory.GetPlantingDays(out PlantingDays, out HarvestDays);
+        // }
+        // catch (IndexOutOfRangeException ex)
+        // {
+        //     Console.WriteLine($"IndexOutOfRangeException error generating planting days: {ex.Message}");
+        // }
+        // catch (Exception ex)
+        // {
+        //     Console.WriteLine($"Error generating planting days: {ex.Message}");
+        // }
 
-            for (int i = 1; i <= Schedule.MaxDays; ++i)
-            {
+        // // Modify schedule if tile limit reached
+        // ScheduleDetails = new DayDetails[Schedule.MaxDays + 1];
+        // for (int i = 1; i <= Schedule.MaxDays; ++i) ScheduleDetails[i] = new DayDetails() { cropsNumberToPlant = new List<int>() };
 
-                // Selling Day
-                double moneyReceived = 0;
-                int unitsSold = 0;
-                List<Plant> plantsToRemove = new List<Plant>();
+        // TileLimited = factory.GetNewSchedule(Crops, AvailableTiles, AvailableGold, out PlantingDays, out ScheduleDetails, out Schedule);
 
-                foreach (var persistentPlant in persistentPlants)
-                {
-                    if (persistentPlant.HarvestDays.Contains(i))
-                    {
-                        moneyReceived += persistentPlant.Crop.sellPrice;
-                        ++unitsSold;
-                        HarvestDays[i] = true;
+        // // Unlimited: can't calculate profit
+        // if (AvailableTiles <= 0 && AvailableGold <= 0)
+        // {
+        //     Console.WriteLine("MODE: THEORETICAL");
 
-                        if (!persistentPlant.Persistent)
-                            plantsToRemove.Add(persistentPlant);
-                    }
-                }
+        //     Profit = 0;
+        // }
+        // // Gold-limited:
+        // // -Calculate flat profit
+        // // -Calculate ScheduleDetails
+        // else if (!TileLimited)
+        // {
+        //     // TODO TEST THIS: shouldn't need harvest days
 
-                foreach (var plantToRemove in plantsToRemove)
-                    persistentPlants.Remove(plantToRemove);
+        //     Console.WriteLine("MODE: GOLD LIMITED");
 
-                if (moneyReceived > 0)
-                {
-                    Profit += moneyReceived;
-                    Console.WriteLine($"SELL DAY {i}: Sold {unitsSold} plants for +{moneyReceived}g. Profit: {Profit}g");
-                }
+        //     var curGold = AvailableGold;
 
-                if (PlantingDays[i])
-                {
-                    // Buying Day
-                    List<Crop> cropList = Schedule.GetCrops(i);
-                    int unitsPlanted = ScheduleDetails[i].numberToPlant;
+        //     List<Plant> persistentPlants = new();
 
-                    if (cropList != null && cropList.Count > 0)
-                    {
-                        var curCrop = cropList[0];
+        //     Console.WriteLine($"\nWallet: {curGold}g\n");
 
-                        // Buy
-                        Profit -= unitsPlanted * curCrop.buyPrice;
+        //     for (int i = 1; i <= Schedule.MaxDays; ++i)
+        //     {
+        //         if (PlantingDays[i])
+        //         {
+        //             // Buying Day
+        //             List<Crop> cropList = Schedule.GetCrops(i);
 
-                        // Save recurring crop for next time
-                        for (int j = 0; j < unitsPlanted; ++j)
-                            persistentPlants.Add(new Plant(curCrop, i, Schedule.MaxDays, curCrop.timeToMaturity, curCrop.yieldRate));
+        //             if (cropList != null && cropList.Count > 0)
+        //             {
+        //                 var curCrop = cropList[0];
 
-                        Console.WriteLine($"BUY DAY {i}: Planted {unitsPlanted} {curCrop.name} for -{unitsPlanted * curCrop.buyPrice}g. Profit: {Profit}g");
-                    }
-                }
-            }
+        //                 // Buy
+        //                 var unitsPlanted = (int)(curGold / curCrop.buyPrice);
+        //                 var moneySpent = unitsPlanted * curCrop.buyPrice;
+        //                 curGold -= moneySpent;
 
-            Console.WriteLine($"\n Profit: {Profit} \n");
-        }
+        //                 Console.WriteLine($"BUY DAY {i}: Planted {unitsPlanted} {curCrop.name} for {moneySpent}g. Wallet: {curGold}g");
+
+        //                 // Save recurring crop for next time
+        //                 for (int j = 0; j < unitsPlanted; ++j)
+        //                 {
+        //                     var plant = new Plant(curCrop, i, Schedule.MaxDays, curCrop.timeToMaturity, curCrop.yieldRate);
+        //                     persistentPlants.Add(plant);
+        //                 }
+
+        //                 ScheduleDetails[i] = new DayDetails() { cropsNumberToPlant = new List<int>() { unitsPlanted } };
+        //             }
+        //         }
+        //         else
+        //         {
+        //             // Selling Day
+        //             // Can't occur on buying day since we're gold-limited, and so won't have gold until the day after a sale
+        //             double moneyReceived = 0;
+        //             int unitsSold = 0;
+        //             List<Plant> plantsToRemove = new List<Plant>();
+
+        //             foreach (var persistentPlant in persistentPlants)
+        //             {
+        //                 if (persistentPlant.HarvestDays.Contains(i))
+        //                 {
+        //                     moneyReceived += persistentPlant.Crop.sellPrice;
+        //                     ++unitsSold;
+
+        //                     if (!persistentPlant.Persistent)
+        //                         plantsToRemove.Add(persistentPlant);
+        //                 }
+        //             }
+
+        //             if (moneyReceived > 0)
+        //             {
+        //                 curGold += moneyReceived;
+        //                 Console.WriteLine($"SELL DAY {i}: Sold {unitsSold} {persistentPlants[0].Crop.name}... for {moneyReceived}g. Wallet: {curGold}g");
+        //             }
+
+        //             foreach (var plantToRemove in plantsToRemove)
+        //                 persistentPlants.Remove(plantToRemove);
+        //         }
+        //     }
+
+        //     Profit = curGold - AvailableGold;
+        // }
+        // // Tile-limited
+        // // -Calculate flat profit
+        // // (ScheduleDetails provided)
+        // else
+        // {
+        //     // TODO TEST THIS: should set harvest days
+        //     Console.WriteLine("\nMODE: TILE LIMITED:");
+
+        //     HarvestDays = new bool[Schedule.MaxDays + 1];
+
+        //     Profit = 0;
+        //     double InitialGold = AvailableGold;
+
+        //     List<Plant> persistentPlants = new();
+
+        //     Console.WriteLine($"\nStarting Wallet: {InitialGold}g\n");
+
+        //     for (int i = 1; i <= Schedule.MaxDays; ++i)
+        //     {
+        //         // Selling Day
+        //         double moneyReceived = 0;
+        //         int unitsSold = 0;
+        //         List<Plant> plantsToRemove = new List<Plant>();
+
+        //         foreach (var persistentPlant in persistentPlants)
+        //         {
+        //             if (persistentPlant.HarvestDays.Contains(i))
+        //             {
+        //                 moneyReceived += persistentPlant.Crop.sellPrice;
+        //                 ++unitsSold;
+        //                 HarvestDays[i] = true;
+
+        //                 if (!persistentPlant.Persistent)
+        //                     plantsToRemove.Add(persistentPlant);
+        //             }
+        //         }
+
+        //         if (moneyReceived > 0)
+        //         {
+        //             Profit += moneyReceived;
+        //             Console.WriteLine($"SELL DAY {i}: Sold {unitsSold} {persistentPlants[0].Crop.name}... for +{moneyReceived}g. Profit: {Profit}g. Wallet: {(InitialGold > 0 ? (InitialGold + Profit).ToString() : "inf")}");
+        //         }
+
+        //         foreach (var plantToRemove in plantsToRemove)
+        //             persistentPlants.Remove(plantToRemove);
+
+        //         if (PlantingDays[i])
+        //         {
+        //             // Buying Day
+        //             List<Crop> cropList = Schedule.GetCrops(i);
+
+        //             if (cropList != null && cropList.Count > 0)
+        //             {
+        //                 for (int cropIndex = 0; cropIndex < cropList.Count; ++cropIndex)
+        //                 {
+        //                     Crop curCrop = null;
+        //                     int unitsPlanted = 0;
+
+        //                     curCrop = cropList[cropIndex];
+        //                     unitsPlanted = ScheduleDetails[i].cropsNumberToPlant[cropIndex];
+
+        //                     // Buy
+        //                     Profit -= unitsPlanted * curCrop.buyPrice;
+
+        //                     // Save recurring crop for next time
+        //                     for (int j = 0; j < unitsPlanted; ++j)
+        //                         persistentPlants.Add(new Plant(curCrop, i, Schedule.MaxDays, curCrop.timeToMaturity, curCrop.yieldRate));
+
+        //                     Console.WriteLine($"BUY DAY {i}: Planted {unitsPlanted} {curCrop.name} for -{unitsPlanted * curCrop.buyPrice}g. Profit: {Profit}g. Wallet: {(InitialGold > 0 ? (InitialGold + Profit).ToString() : "inf")}");
+        //                 }
+        //             }
+        //         }
+        //     }
+
+        //     if (AvailableGold == 0)
+        //         Console.WriteLine($"\n Profit: {Profit} \n");
+        //     else
+        //         Console.WriteLine($"\n Wallet: {InitialGold + Profit} \n");
+        // }
     }
 }

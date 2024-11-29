@@ -96,18 +96,6 @@ namespace StardewCropCalculatorLibrary
         }
 
         /// <summary>
-        /// Remove crop to planting schedule.
-        /// </summary>
-        //public void RemoveCrop(int day, Crop crop)
-        //{
-        //    if (plantingSchedule[day] == null)
-        //        plantingSchedule[day] = new List<Crop>();
-
-
-        //    plantingSchedule[day].Remove(crop); // Removes first occurence
-        //}
-
-        /// <summary>
         /// Add the input schedule to this schedule.
         /// </summary>
         /// <param name="otherSchedule"></param>
@@ -127,6 +115,15 @@ namespace StardewCropCalculatorLibrary
                     this.AddCrop(day, crop);
                 }
             }
+        }
+
+        public void Clear()
+        {
+            plantingSchedule = new List<Crop>[maxDays + 1];
+
+            // Empty-list-init all elements
+            for (int day = 1; day <= maxDays; ++day)
+                plantingSchedule[day] = new List<Crop>();
         }
 
         /// <summary>
