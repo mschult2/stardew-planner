@@ -49,7 +49,7 @@
         <div class="form-row">
             <label>Total Sell Price:</label>
             <input type="number" @bind="NewCropSellPrice" />
-            <span>(remember to account for multiple yields in one harvest)</span>
+            <span>(account for plants that yield multiple fruits/veggies in one harvest, like blueberries)</span>
         </div>
     </form>
     <br />
@@ -269,7 +269,7 @@
 
         .aligned-form input {
             flex-grow: 1; /* Let input fields fill available space */
-            padding: 5px;
+            padding: 2.5px;
             border: 1px solid #ccc;
             border-radius: 5px;
             max-width: 300px; /* Prevent overly wide inputs */
