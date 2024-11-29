@@ -53,7 +53,7 @@
         </div>
     </form>
     <br />
-    <button type="button" @onclick="AddCrop">Add Crop</button>
+    <button type="button" class="primary-button" @onclick="AddCrop">Add Crop</button>
 </div>
 
 
@@ -67,13 +67,14 @@
         <ul>
             @foreach (var crop in Crops)
             {
-                <li>
-                    @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g@(
-            crop.yieldRate > 0 && crop.yieldRate < 1000
-            ? $", Yield Rate: {crop.yieldRate} days"
-            : ", Yield Rate: N/A")
-                    , Profitability-per-tile: @crop.TPI)
-                    <button type="button" @onclick="(() => DeleteCrop(crop))">Delete</button>
+                <li class="crop-item">
+                    <div class="crop-content">
+                        <span>
+                            @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g
+                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"), Profitability-per-tile: @crop.TPI)
+                        </span>
+                        <button type="button" class="delete-btn" @onclick="(() => DeleteCrop(crop))">Delete</button>
+                    </div>
                 </li>
             }
         </ul>
@@ -84,6 +85,8 @@
         <p>No crops added yet. Add crops to see them here.</p>
     }
 </div>
+
+
 
 <br />
 
@@ -114,7 +117,7 @@
 
 <div>
     <h4>Planting Calendar</h4>
-    <button @onclick="GenerateCalendar">Generate Calendar</button>
+    <button @onclick="GenerateCalendar" class="big-button">Generate Calendar!</button>
     <div>
         <p></p>
 
@@ -195,6 +198,36 @@
 <br />
 
 <style>
+    .primary-button {
+        background-color: #2196f3; /* Blue */
+        margin-top: 10px;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+        .primary-button:hover {
+            background-color: #0a65ad;
+    }
+
+    .big-button {
+        background-color: #2196f3; /* Blue */
+        margin-top: 10px;
+        color: white;
+        border: none;
+        padding: 13px 19.5px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-weight: bold;
+        font-size: 1.2em;
+    }
+
+        .big-button:hover {
+            background-color: #0a65ad;
+        }
+
     .calendar-table {
         width: 100%;
         border-collapse: collapse;
@@ -248,6 +281,21 @@
             background-color: #ff0000;
         }
 
+    .delete-btn {
+        background-color: #ff4d4d; /* Same red background as "Delete All" */
+        color: white; /* White text for contrast */
+        /*border: none;*/ /* Remove border */
+        padding: 3px 10px; /* Smaller padding for reduced height */
+        cursor: pointer; /* Pointer cursor on hover */
+        border-radius: 4px; /* Slightly rounded corners */
+        border: none; /* Remove border */
+        width: 100px; /* Ensure consistent width for buttons */
+    }
+
+        .delete-btn:hover {
+            background-color: #ff0000; /* Darker red on hover */
+        }
+
     /* Align form inputs and labels */
     .aligned-form {
         display: flex;
@@ -281,6 +329,17 @@
             white-space: nowrap; /* Prevent text from wrapping */
         }
 
+    .crop-item {
+        margin-bottom: 2px; /* Add spacing between list items */
+    }
+
+    .crop-content {
+        display: grid; /* Use CSS Grid */
+        grid-template-columns: auto 120px; /* Text takes remaining space; button fixed width */
+        align-items: center; /* Vertically align items */
+        gap: 10px; /* Add spacing between text and button */
+        max-width: 950px; /* Constrain the total width of the container */
+    }
 
 
 </style>
@@ -323,9 +382,11 @@
 
     protected override void OnInitialized()
     {
-        // Automatically generate the calendar when the page loads
-        if (Crops != null && Crops.Count > 0)
-            GenerateCalendar();
+        // Since it takes a while to populate, don't automatically generate the schedule when the page loads
+        // if (Crops != null && Crops.Count > 0)
+        //     GenerateCalendar();
+
+        ClearSchedule();
     }
 
     // Add a new crop to the list
@@ -359,10 +420,7 @@
     private void DeleteAllCrops()
     {
         Crops.Clear();
-        Schedule = null; // Clear the schedule
-        ScheduleDetails = new DayDetails[NumDays + 1];
-        PlantingDays = new bool[NumDays + 1];
-        HarvestDays = new bool[NumDays + 1];
+        ClearSchedule();
     }
 
     private void ClearSchedule()
