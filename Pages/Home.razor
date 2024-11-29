@@ -72,7 +72,7 @@
             crop.yieldRate > 0 && crop.yieldRate < 1000
             ? $", Yield Rate: {crop.yieldRate} days"
             : ", Yield Rate: N/A")
-                    , Profit Index: @crop.TPI)
+                    , Profitability-per-tile: @crop.TPI)
                     <button type="button" @onclick="(() => DeleteCrop(crop))">Delete</button>
                 </li>
             }
@@ -252,13 +252,13 @@
     .aligned-form {
         display: flex;
         flex-direction: column; /* Stack each form row vertically */
-        gap: 15px; /* Space between rows */
+        gap: 7px; /* Space between rows */
     }
 
         .aligned-form .form-row {
             display: flex;
             align-items: center; /* Vertically align items */
-            gap: 10px; /* Space between label and input/span */
+            gap: 8px; /* Space between label and input/span */
         }
 
         .aligned-form label {
@@ -374,7 +374,7 @@
     }
 
     // Generate the planting schedule
-    private void GenerateCalendar()
+    private async void GenerateCalendar()
     {
         ClearSchedule();
 
@@ -383,7 +383,10 @@
 
         var factory2 = new PlantScheduleFactory2(NumDays);
 
-        Profit = factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold, out PlantScheduleFactory2.GameStateCalendar calendar);
+        var profitAndSchedule = await factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
+
+        Profit = profitAndSchedule.Item1;
+        var calendar = profitAndSchedule.Item2;
 
         // Convert Calendar to Schedule
         if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
@@ -437,5 +440,7 @@
         // {
         //     Console.WriteLine($"Error generating planting days: {ex.Message}");
         // }
+
+        StateHasChanged();
     }
 }

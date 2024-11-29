@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -130,25 +131,29 @@ namespace StardewCropCalculatorLibrary
         }
 
         /// <summary>
-        /// Return the most profitable crop to plant on day x. Also returns the cumulative profit it fetches.
+        /// Return the optimial schedule.
         /// </summary>
-        public double GetMostProfitableCrop(int day, List<Crop> crops, int availableTiles, double availableGold, out GameStateCalendar calendar)
+        public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int day, List<Crop> crops, int availableTiles, double availableGold)
         {
-            calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
+            var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
             // Find cheapest crop
             Crop cheapestCrop = crops[0];
             foreach (var crop in crops)
                 cheapestCrop = crop.buyPrice < cheapestCrop.buyPrice ? crop : cheapestCrop;
 
-           return GetMostProfitableCropRecursive(day, crops, cheapestCrop.buyPrice, calendar);
+            var profit = await GetMostProfitableCropRecursive(day, crops, cheapestCrop.buyPrice, calendar);
+
+            return Tuple.Create(profit, calendar);
         }
 
         /// <summary>
         /// Return the most profitable crop to plant on day x. Also returns the cumulative profit it fetches.
         /// </summary>
-        private double GetMostProfitableCropRecursive(in int day, in List<Crop> crops, in double goldLowerLimit, GameStateCalendar calendar)
+        private async Task<double> GetMostProfitableCropRecursive(int day, List<Crop> crops, double goldLowerLimit, GameStateCalendar calendar)
         {
+            await Task.Yield();
+
             double bestProfit = 0;
             GameStateCalendar bestCalendar = null;
 
@@ -181,6 +186,10 @@ namespace StardewCropCalculatorLibrary
                 double cumulativeSale = 0;
                 int curUnits = unitsToPlant;
 
+                // Modify day's game state from what it was previously according to the new crop being planted.
+                // Example: Day 8 and so on may have had 2000 gold and 15 tiles, because of crops we planted on day 1.
+                // So if we plant a new crop in the above code on day 8, we want to decrease the tiles and gold for day 8 and so on.
+                // Until the crop is harvested and perhaps dies at 8 + x, at which point we increase our tiles and gold for day 8 + x and so on.
                 if (unitsToPlant > 0)
                 {
                     for (int j = day; j <= numDays; ++j)
@@ -189,7 +198,7 @@ namespace StardewCropCalculatorLibrary
                         {
                             // Payday:
 
-                            // Decrease tiles if not dead
+                            // Decrease tiles if plant is not dead
                             if (!plantBatch.Persistent)
                                 curUnits = 0;
 
@@ -218,8 +227,6 @@ namespace StardewCropCalculatorLibrary
 
                             // Modify gold
                             localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
-
-
                         }
                     }
                 }
@@ -233,7 +240,7 @@ namespace StardewCropCalculatorLibrary
                     profit = localCalendar.GameStates[nextDay].Wallet - availableGold;
 
                     if (nextDay <= numDays - 1)
-                        profit += GetMostProfitableCropRecursive(nextDay, crops, goldLowerLimit, localCalendar); // profit can be made sitting around doing nothing
+                        profit += await GetMostProfitableCropRecursive(nextDay, crops, goldLowerLimit, localCalendar); // profit can be made sitting around doing nothing
                 }
 
                 // Save best crop
