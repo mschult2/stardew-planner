@@ -300,39 +300,16 @@
     // Default crop list
     private List<Crop> Crops = new()
     {
-        // // new Crop("Blueberry", 13, 4, 80, 150),
-        // // new Crop("Hot Pepper", 5, 3, 40, 40),
-        // // new Crop("Melon", 12, 1000, 80, 250),
-        // // new Crop("Hops", 11, 1, 60, 25),
-        // new Crop("Tomato", 11, 4, 50, 60),
-        // new Crop("Radish", 6, 1000, 40, 90),
-        // // new Crop("Poppy", 7, 1000, 100, 140),
-        // // new Crop("Spangle", 8, 1000, 50, 90),
-        // new Crop("Starfruit", 13, 1000, 400, 750),
-        // // new Crop("Wheat", 4, 1000, 10, 25),
-
-        // All temp crops!
-        // new Crop("Blueberry", 13, 4, 80, 150),
-        // new Crop("Hot Pepper", 5, 3, 40, 40),
+        new Crop("Blueberry", 13, 4, 80, 150),
+        new Crop("Hot Pepper", 5, 3, 40, 40),
         new Crop("Melon", 12, 1000, 80, 250),
-        // new Crop("Hops", 11, 1, 60, 25),
-        // new Crop("Tomato", 11, 4, 50, 60),
+        new Crop("Hops", 11, 1, 60, 25),
+        new Crop("Tomato", 11, 4, 50, 60),
         new Crop("Radish", 6, 1000, 40, 90),
         new Crop("Poppy", 7, 1000, 100, 140),
         new Crop("Spangle", 8, 1000, 50, 90),
         new Crop("Starfruit", 13, 1000, 400, 750),
         new Crop("Wheat", 4, 1000, 10, 25),
-
-        // new Crop("Blueberry", 13, 4, 80, 150),
-        // new Crop("Hot Pepper", 5, 3, 40, 40),
-        // new Crop("Melon", 12, 1000, 80, 250),
-        // new Crop("Hops", 11, 1, 60, 25),
-        // new Crop("Tomato", 11, 4, 50, 60),
-        // new Crop("Radish", 6, 1000, 40, 90),
-        // new Crop("Poppy", 7, 1000, 100, 140),
-        // new Crop("Spangle", 8, 1000, 50, 90),
-        // new Crop("Starfruit", 13, 1000, 400, 750),
-        // new Crop("Wheat", 4, 1000, 10, 25),
     };
     private PlantSchedule Schedule = null;
     private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
@@ -421,17 +398,22 @@
                 {
                     Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
 
-                    PlantingDays[day] = true;
-
-                    ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
-
                     foreach (var batch in dayState.Plants)
                     {
-                        Schedule.AddCrop(day, batch.CropType);
-                        ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
+                        if (batch.PlantDay == day && batch.Count > 0)
+                        {
+                            PlantingDays[day] = true;
 
-                        foreach (int harvestDay in batch.HarvestDays)
-                            HarvestDays[harvestDay] = true;
+                            Schedule.AddCrop(day, batch.CropType);
+
+                            if (ScheduleDetails[day] == null)
+                                ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
+
+                            ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
+
+                            foreach (int harvestDay in batch.HarvestDays)
+                                HarvestDays[harvestDay] = true;
+                        }
                     }
                 }
             }

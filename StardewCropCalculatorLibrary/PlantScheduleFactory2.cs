@@ -93,7 +93,7 @@ namespace StardewCropCalculatorLibrary
             public readonly SortedSet<int> HarvestDays = new SortedSet<int>();
             public bool Persistent => IsPersistent(CropType);
 
-            private int PlantDay;
+            public int PlantDay;
 
             public PlantBatch(Crop cropType, int cropCount, int plantDay)
             {
@@ -167,7 +167,10 @@ namespace StardewCropCalculatorLibrary
                 int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
 
                 // Modify current day state.
-                localCalendar.GameStates[day].Wallet = localCalendar.GameStates[day].Wallet - (unitsToPlant * crop.buyPrice);
+                double cost = unitsToPlant * crop.buyPrice;
+                double sale = unitsToPlant * crop.sellPrice;
+
+                localCalendar.GameStates[day].Wallet = localCalendar.GameStates[day].Wallet - cost;
                 localCalendar.GameStates[day].FreeTiles = localCalendar.GameStates[day].FreeTiles - unitsToPlant;
                 localCalendar.GameStates[day].DayOfInterest = true;
 
@@ -175,39 +178,51 @@ namespace StardewCropCalculatorLibrary
                 var harvestDays = plantBatch.HarvestDays;
                 localCalendar.GameStates[day].Plants.Add(plantBatch);
 
-                for (int j = day; j <= numDays; ++j)
-                {
-                    if (plantBatch.HarvestDays.Contains(j))
-                    {
-                        // If payday:
-                        //  -Wallet increases from the day before
-                        //  -Tiles may increase from the day before, or stay the same
-                        //  -Plants may be gone, or stay the same
-                        localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j].Wallet + (unitsToPlant * crop.sellPrice);
-                        localCalendar.GameStates[day].DayOfInterest = true;
+                double cumulativeSale = 0;
+                int curUnits = unitsToPlant;
 
-                        if (plantBatch.Persistent)
+                if (unitsToPlant > 0)
+                {
+                    for (int j = day; j <= numDays; ++j)
+                    {
+                        if (plantBatch.HarvestDays.Contains(j))
                         {
-                            localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j].FreeTiles;
-                            localCalendar.GameStates[j + 1].Plants.Clear();
-                            localCalendar.GameStates[j + 1].Plants.AddRange(localCalendar.GameStates[j].Plants);
+                            // Payday:
+
+                            // Decrease tiles if not dead
+                            if (!plantBatch.Persistent)
+                                curUnits = 0;
+
+                            if (curUnits > 0)
+                            {
+                                localCalendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
+                                localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
+                            }
+
+                            // Modify gold
+                            cumulativeSale += sale;
+
+                            localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
+                            localCalendar.GameStates[j + 1].DayOfInterest = true;
                         }
                         else
                         {
-                            localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j].FreeTiles + unitsToPlant;
-                            // Don't add plants on this day, they're gone
+                            // Not payday:
+
+                            // Decrease tiles if not dead
+                            if (curUnits > 0)
+                            {
+                                localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
+                                localCalendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
+                            }
+
+                            // Modify gold
+                            localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
+
+
                         }
                     }
-                    else
-                    {
-                        // If not a payday, then game state is same as the day before
-                        localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j].Wallet;
-                        localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j].FreeTiles;
-                        localCalendar.GameStates[j + 1].Plants.Clear();
-                        localCalendar.GameStates[j + 1].Plants.AddRange(localCalendar.GameStates[j].Plants);
-                    }
                 }
-
 
                 // Calculate payday.
                 int nextDay = day + crop.timeToMaturity + 1;
@@ -215,15 +230,10 @@ namespace StardewCropCalculatorLibrary
                 if (nextDay <= numDays + 1)
                 {
                     // Calculate payday profit.
-                    //profit = unitsToPlant * crop.sellPrice - unitsToPlant * crop.buyPrice;
                     profit = localCalendar.GameStates[nextDay].Wallet - availableGold;
 
-                    // Calculate payday starting state.
-                    //localCalendar.GameStates[nextDay].FreeTiles = availableTiles;
-                    //localCalendar.GameStates[nextDay].Wallet = availableGold + profit;
-
-                    if (nextDay <= numDays - 1 && localCalendar.GameStates[nextDay].FreeTiles > 0 && localCalendar.GameStates[nextDay].Wallet >= goldLowerLimit)
-                        profit += GetMostProfitableCropRecursive(nextDay, crops, goldLowerLimit, localCalendar);
+                    if (nextDay <= numDays - 1)
+                        profit += GetMostProfitableCropRecursive(nextDay, crops, goldLowerLimit, localCalendar); // profit can be made sitting around doing nothing
                 }
 
                 // Save best crop
