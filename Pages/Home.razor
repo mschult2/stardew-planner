@@ -399,7 +399,9 @@
     // Generate the planting schedule
     private void GenerateCalendar()
     {
-        if (!Crops.Any() && AvailableTiles <= 0 && AvailableGold <= 0)
+        ClearSchedule();
+
+        if (!Crops.Any() || AvailableTiles <= 0 || AvailableGold <= 0)
             return;
 
         var factory2 = new PlantScheduleFactory2(NumDays);
@@ -407,7 +409,6 @@
         Profit = factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold, out PlantScheduleFactory2.GameStateCalendar calendar);
 
         // Convert Calendar to Schedule
-        ClearSchedule();
         if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
         {
             Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
@@ -415,6 +416,7 @@
             {
                 var dayState = calendar.GameStates[day];
 
+                // Currently days-of-interest only represent planting paydays (not harvest days)
                 if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                 {
                     Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
