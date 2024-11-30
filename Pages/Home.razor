@@ -86,39 +86,31 @@
     }
 </div>
 
-
-
 <br />
 
+
+
 <div>
-    <h4>Conclusion</h4>
-    @if (Schedule != null)
-    {
-        @if (Profit >= 0)
+    <h4>Planting Schedule</h4>
+    
+    <!-- Generate Schedule button -->
+    <button disabled="@(IsBusy)" @onclick="GenerateCalendar" class="big-button">Generate Schedule!</button>
+
+    <!-- Profit -->
+    <div></div>
+
+    <div>
+        @if (Profit >= 0 && Schedule != null)
         {
-            <p>Your actual Profit is: <strong>@Profit.ToString("N0") gold</strong></p>
+            <p><strong>Profit: @Profit.ToString("N0") gold</strong></p>
         }
         else
         {
-            <p>Your actual Profit is: <strong>??</strong> (to see this, set Available Gold)</p>
+            <p><strong>Profit: N/A</strong></p>
         }
+    </div>
 
-        @if (!TileLimited)
-        {
-            <p>Your theoretical Investment Multiple is: <strong>@InvestmentMultiplier.ToString("F1")x</strong></p>
-        }
-
-    }
-    else
-    {
-        <p>No schedule generated yet. Add crops and click "Generate Schedule."</p>
-    }
-</div>
-
-<div>
-    <h4>Planting Calendar</h4>
-    <button disabled="@(IsBusy)" @onclick="GenerateCalendar" class="big-button">Generate Schedule!</button>
-    <p></p>
+    <!-- Calendar -->
     <div>
         @if (Schedule != null)
         {
@@ -149,7 +141,7 @@
                                 // Determine the class for planting day
                                 string cellClass = plantingDay ? "planting-day" : "";
 
-                                <td class="@cellClass">
+                                    <td class="@cellClass">
                                     <div style="position: relative;">
                                         @if (HarvestDays[day])
                                         {
@@ -171,10 +163,6 @@
                                                 }
                                             }
                                         }
-                                @*         else
-                                        {
-                                            <div>No Crop</div>
-                                        } *@
                                     </div>
                                 </td>
                             }
@@ -188,7 +176,7 @@
                 {
                     <div class="calendar-overlay">
                         <div class="spinner"></div>
-                        <p style="font-size: 1.5em;" >Loading... Please wait a few seconds</p>
+                        <p style="font-size: 1.25em;" >Loading... Please wait a few seconds</p>
                     </div>
                 }
             </div>
@@ -198,9 +186,10 @@
             <p>No schedule generated yet. Add crops and click "Generate Schedule."</p>
         }
     </div>
-</div>
 
-<br />
+    <br />
+
+</div>
 
 <style>
     .primary-button {
@@ -226,15 +215,21 @@
         cursor: pointer;
         border-radius: 5px;
         font-weight: bold;
-        font-size: 1.2em;
     }
 
         .big-button:hover {
             background-color: #0a65ad;
         }
 
+    /* Calendar container */
+    .calendar-container {
+        width: 1400px;
+        position: relative; /* Makes it a positioning context for the overlay */
+        opacity: 1; /* Normal content visibility */
+    }
+
     .calendar-table {
-        width: 100%;
+        width: 1400px;
         border-collapse: collapse;
     }
 
@@ -243,6 +238,8 @@
             padding: 8px;
             text-align: center; /* Center-align the content for calendar cells */
             vertical-align: top; /* Align content to the top of the cell */
+            min-width: 120px; /* Fixed minimum cell width */
+            overflow: hidden; /* Prevent content overflow */
         }
 
         .calendar-table th {
@@ -253,7 +250,7 @@
         .calendar-table td {
             height: 180px; /* Ensure consistent height for calendar cells */
             aspect-ratio: 1 / 1; /* Maintain a 1:1 width-to-height ratio */
-            min-width: 120px; /* Ensure consistent width */
+            position: relative;
         }
 
         /* Highlight planting days */
@@ -265,8 +262,8 @@
     .harvest-marker {
         position: absolute;
         top: 2px;
-        left: 2px;
-        font-size: 15px;
+        left: 0px;
+        font-size: 14px;
         font-weight: bold;
         color: #ff9933; /* Orange */
     }
@@ -353,12 +350,6 @@
         opacity: 0.6; /* Make it look disabled */
     }
 
-    /* Calendar container */
-    .calendar-container {
-        position: relative; /* Makes it a positioning context for the overlay */
-        opacity: 1; /* Normal content visibility */
-    }
-
     /* Overlay */
     .calendar-overlay {
         position: absolute; /* Position relative to .calendar-container */
@@ -420,7 +411,7 @@
         new Crop("Starfruit", 13, 1000, 400, 750),
         new Crop("Wheat", 4, 1000, 10, 25),
     };
-    private PlantSchedule Schedule = null;
+    private PlantSchedule Schedule = new(NumDays);
     private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
 
     private const int NumDays = 28; // Stardew Valley season length
