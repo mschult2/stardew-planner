@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -103,7 +104,11 @@ namespace StardewCropCalculatorLibrary
                 PlantDay = plantDay;
 
                 int harvestDate = plantDay + cropType.timeToMaturity;
-                HarvestDays.Add(harvestDate);
+
+                if (harvestDate <= 28)
+                    HarvestDays.Add(harvestDate);
+                else
+                    return;
 
                 while (harvestDate + cropType.yieldRate <= 28)
                 {
@@ -123,7 +128,10 @@ namespace StardewCropCalculatorLibrary
             }
         }
 
-        public int NumDays;
+        // GameState cache
+        private readonly Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>> answerCache = new Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>>();
+
+        private int NumDays;
 
         public PlantScheduleFactory2(int numDays)
         {
@@ -135,6 +143,10 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int day, List<Crop> crops, int availableTiles, double availableGold)
         {
+            // If tiles are infinite but gold is finite, it's still sane to calculate profit in gold.
+            if (availableTiles <= 0)
+                availableTiles = 1000000000;
+
             var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
             // Find cheapest crop
@@ -142,49 +154,59 @@ namespace StardewCropCalculatorLibrary
             foreach (var crop in crops)
                 cheapestCrop = crop.buyPrice < cheapestCrop.buyPrice ? crop : cheapestCrop;
 
-            var profit = await GetMostProfitableCropRecursive(day, crops, cheapestCrop.buyPrice, calendar);
+            var wealth = await GetMostProfitableCropRecursive(day, crops, cheapestCrop.buyPrice, calendar);
 
-            return Tuple.Create(profit, calendar);
+            return Tuple.Create(wealth, calendar);
         }
 
         /// <summary>
-        /// Return the most profitable crop to plant on day x. Also returns the cumulative profit it fetches.
+        /// Return the maximum amount of gold you can end the season with, and the schedule accompanies it.
         /// </summary>
         private async Task<double> GetMostProfitableCropRecursive(int day, List<Crop> crops, double goldLowerLimit, GameStateCalendar calendar)
         {
             await Task.Yield();
 
-            double bestProfit = 0;
+            double bestWealth = 0;
             GameStateCalendar bestCalendar = null;
 
             int numDays = calendar.NumDays;
             int availableTiles = calendar.GameStates[day].FreeTiles;
             double availableGold = calendar.GameStates[day].Wallet;
 
+            // Check cache for quick answer
+            if (answerCache != null && answerCache.TryGetValue(day, out var goldDict))
+            {
+                if (goldDict != null && goldDict.TryGetValue(availableGold, out var tileDict))
+                {
+                    if (tileDict != null && tileDict.TryGetValue(availableTiles, out var wealthSchedulePair))
+                    {
+                        double cachedWealth = wealthSchedulePair.Item1;
+                        GameStateCalendar cachedCalendar = wealthSchedulePair.Item2;
+
+                        if (cachedCalendar != null)
+                        {
+                            //Console.WriteLine($"[DEBUG] Accessed cache!!!! Day: {day}, availableGold: {availableGold}, availableTiles: {availableTiles}, ");
+                            calendar.Merge(cachedCalendar, day);
+                            return cachedWealth;
+                        }
+                    }
+                }
+            }
+
             foreach (var crop in crops)
             {
                 var localCalendar = new GameStateCalendar(calendar);
-                double profit = 0;
+                double endWealth = 0;
 
                 // Calculate number of units to plant.
                 int unitsCanAfford = ((int)(availableGold / crop.buyPrice));
                 bool goldLimited = availableTiles >= unitsCanAfford;
                 int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
 
-                // Modify current day state.
-                double cost = unitsToPlant * crop.buyPrice;
-                double sale = unitsToPlant * crop.sellPrice;
-
-                localCalendar.GameStates[day].Wallet = localCalendar.GameStates[day].Wallet - cost;
-                localCalendar.GameStates[day].FreeTiles = localCalendar.GameStates[day].FreeTiles - unitsToPlant;
-                localCalendar.GameStates[day].DayOfInterest = true;
-
-                PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day);
-                var harvestDays = plantBatch.HarvestDays;
-                localCalendar.GameStates[day].Plants.Add(plantBatch);
-
-                double cumulativeSale = 0;
-                int curUnits = unitsToPlant;
+                // Short-circuit number of units if too close to end of month for it to make money.
+                if ((day + crop.timeToMaturity > 28)
+                    || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
+                    unitsToPlant = 0;
 
                 // Modify day's game state from what it was previously according to the new crop being planted.
                 // Example: Day 8 and so on may have had 2000 gold and 15 tiles, because of crops we planted on day 1.
@@ -192,6 +214,21 @@ namespace StardewCropCalculatorLibrary
                 // Until the crop is harvested and perhaps dies at 8 + x, at which point we increase our tiles and gold for day 8 + x and so on.
                 if (unitsToPlant > 0)
                 {
+                    // Modify current day state.
+                    double cost = unitsToPlant * crop.buyPrice;
+                    double sale = unitsToPlant * crop.sellPrice;
+
+                    localCalendar.GameStates[day].Wallet = localCalendar.GameStates[day].Wallet - cost;
+                    localCalendar.GameStates[day].FreeTiles = localCalendar.GameStates[day].FreeTiles - unitsToPlant;
+                    localCalendar.GameStates[day].DayOfInterest = true;
+
+                    PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day);
+                    var harvestDays = plantBatch.HarvestDays;
+                    localCalendar.GameStates[day].Plants.Add(plantBatch);
+
+                    double cumulativeSale = 0;
+                    int curUnits = unitsToPlant;
+
                     for (int j = day; j <= numDays; ++j)
                     {
                         if (plantBatch.HarvestDays.Contains(j))
@@ -229,33 +266,39 @@ namespace StardewCropCalculatorLibrary
                             localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
                         }
                     }
+
+                    for (int j = day + 1; j <= numDays; ++j)
+                    {
+                        if (localCalendar.GameStates[j].Wallet >= goldLowerLimit && localCalendar.GameStates[j].FreeTiles > 0)
+                        {
+                            await GetMostProfitableCropRecursive(j, crops, goldLowerLimit, localCalendar);
+                            break;
+                        }
+                    }
                 }
 
-                // Calculate payday.
-                int nextDay = day + crop.timeToMaturity + 1;
-
-                if (nextDay <= numDays + 1)
-                {
-                    // Calculate payday profit.
-                    profit = localCalendar.GameStates[nextDay].Wallet - availableGold;
-
-                    if (nextDay <= numDays - 1)
-                        profit += await GetMostProfitableCropRecursive(nextDay, crops, goldLowerLimit, localCalendar); // profit can be made sitting around doing nothing
-                }
+                endWealth = localCalendar.GameStates[29].Wallet;
 
                 // Save best crop
-                if (profit > bestProfit)
+                if (endWealth > bestWealth)
                 {
-                    bestProfit = profit;
+                    bestWealth = endWealth;
                     bestCalendar = localCalendar;
                 }
             }
 
+            // Update cache if the real deal
+            if (!answerCache.ContainsKey(day))
+                answerCache[day] = new Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>();
+            if (!answerCache[day].ContainsKey(availableGold))
+                answerCache[day][availableGold] = new Dictionary<int, Tuple<double, GameStateCalendar>>();
+            if (!answerCache[day][availableGold].ContainsKey(availableTiles) || bestWealth > answerCache[day][availableGold][availableTiles].Item1)
+                answerCache[day][availableGold][availableTiles] = Tuple.Create(bestWealth, bestCalendar);
+
             if (bestCalendar != null)
                 calendar.Merge(bestCalendar, day);
 
-
-            return bestProfit;
+            return bestWealth;
         }
 
         private static bool IsPersistent(Crop crop)

@@ -112,6 +112,15 @@
                         {
                             <p><strong>Profit: N/A</strong></p>
                         }
+
+                        @if (InvestmentMultiplier >= 0 && Schedule != null)
+                        {
+                            <p><strong>@($"ROI: {((InvestmentMultiplier - 1) * 100).ToString("N0")}%")</strong></p>
+                        }
+                        else
+                        {
+                            <p><strong>ROI: N/A</strong></p>
+                        }
                     </div>
 
                     <table class="calendar-table">
@@ -209,7 +218,7 @@
     .big-button {
         background-color: #2196f3; /* Blue */
         margin-top: 10px;
-        margin-bottom: 50px; /* Add space below the button */
+        margin-bottom: 60px; /* Add space below the button */
         color: white;
         border: none;
         padding: 13px 19.5px;
@@ -224,7 +233,7 @@
 
     .profit-overlay {
         position: absolute; /* Position relative to the calendar-wrapper */
-        top: -4%; /* Center vertically */
+        top: -7%; /* Center vertically */
         left: 50%; /* Center horizontally */
         transform: translate(-50%, -50%); /* Adjust position to center */
         padding: 10px 20px; /* Add padding for better visibility */
@@ -424,6 +433,10 @@
         new Crop("Spangle", 8, 1000, 50, 90),
         new Crop("Starfruit", 13, 1000, 400, 750),
         new Crop("Wheat", 4, 1000, 10, 25),
+
+        // new Crop("Blueberry", 13, 4, 80, 150),
+        // new Crop("Hot Pepper", 5, 3, 40, 40),
+        // new Crop("Radish", 6, 1000, 40, 90),
     };
     private PlantSchedule Schedule = new(NumDays);
     private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
@@ -431,7 +444,7 @@
     private const int NumDays = 28; // Stardew Valley season length
     private bool[] PlantingDays = new bool[NumDays + 1];
     private bool[] HarvestDays = new bool[NumDays + 1];
-    private double InvestmentMultiplier;
+    private double InvestmentMultiplier = -1;
     private double Profit = -1;
     private bool TileLimited;
     private bool IsBusy;
@@ -485,83 +498,147 @@
         ScheduleDetails = new DayDetails[NumDays + 1];
         PlantingDays = new bool[NumDays + 1];
         HarvestDays = new bool[NumDays + 1];
+        InvestmentMultiplier = -1;
+        Profit = -1;
     }
+
+    private PlantScheduleFactory2 factory2 = new PlantScheduleFactory2(NumDays);
 
     // Generate the planting schedule
     private async void GenerateCalendar()
     {
         ClearSchedule();
 
-        if (!Crops.Any() || AvailableTiles <= 0 || AvailableGold <= 0)
+        if (!Crops.Any() || AvailableGold <= 0)
             return;
 
         IsBusy = true;
 
         try
         {
-            var factory2 = new PlantScheduleFactory2(NumDays);
-
-            var profitAndSchedule = await factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
-
-            Profit = profitAndSchedule.Item1;
-            var calendar = profitAndSchedule.Item2;
-
-            // Convert Calendar to Schedule
-            if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
+            // Calculate schedule with simulation (slow)
+            if (AvailableTiles > 0)
             {
-                Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
-                for (int day = 1; day <= 28; ++day)
+                var wealthAndSchedule = await factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
+
+                // Copy to UI elements: Profit, ROI
+                var totalWealth = wealthAndSchedule.Item1;
+                var calendar = wealthAndSchedule.Item2;
+                Profit = totalWealth - AvailableGold;
+                InvestmentMultiplier = AvailableGold != 0 ? totalWealth / AvailableGold : InvestmentMultiplier;
+
+                // Copy to UI elements: Schedule, ScheduleDetails, PlantingDays/HarvestDays
+                if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
                 {
-                    var dayState = calendar.GameStates[day];
-
-                    // Currently days-of-interest only represent planting paydays (not harvest days)
-                    if (dayState.DayOfInterest && dayState.Plants.Count > 0)
+                    Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
+                    for (int day = 1; day <= 28; ++day)
                     {
-                        Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
+                        var dayState = calendar.GameStates[day];
 
-                        foreach (var batch in dayState.Plants)
+                        // Currently days-of-interest only represent planting paydays (not harvest days)
+                        if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                         {
-                            if (batch.PlantDay == day && batch.Count > 0)
+                            Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
+
+                            foreach (var batch in dayState.Plants)
                             {
-                                PlantingDays[day] = true;
+                                if (batch.PlantDay == day && batch.Count > 0)
+                                {
+                                    PlantingDays[day] = true;
 
-                                Schedule.AddCrop(day, batch.CropType);
+                                    Schedule.AddCrop(day, batch.CropType);
 
-                                if (ScheduleDetails[day] == null)
-                                    ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
+                                    if (ScheduleDetails[day] == null)
+                                        ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
 
-                                ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
+                                    ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
 
-                                foreach (int harvestDay in batch.HarvestDays)
-                                    HarvestDays[harvestDay] = true;
+                                    foreach (int harvestDay in batch.HarvestDays)
+                                    {
+                                        HarvestDays[harvestDay] = true;
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
+            // Calculate schedule with ROI formula (fast, but doesn't support tile limit)
+            else
+            {
+                var factory = new PlantScheduleFactory(NumDays);
 
-            // var factory = new PlantScheduleFactory(NumDays);
+                InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
 
-            // InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
-            // Schedule = bestSchedule;
+                Schedule = bestSchedule;
 
-            // // Get the planting days
-            // try
-            // {
-            //     factory.GetPlantingDays(out PlantingDays, out HarvestDays);
-            // }
-            // catch (IndexOutOfRangeException ex)
-            // {
-            //     Console.WriteLine($"IndexOutOfRangeException error generating planting days: {ex.Message}");
-            // }
-            // catch (Exception ex)
-            // {
-            //     Console.WriteLine($"Error generating planting days: {ex.Message}");
-            // }
+                // Convert to Profit
+                if (AvailableGold > 0)
+                    Profit = (InvestmentMultiplier * AvailableGold) - AvailableGold;
+
+                // Convert to PlantingDays/HarvestDays
+                factory.GetPlantingDays(out PlantingDays, out HarvestDays);
+
+                // Convert to ScheduleDetails
+                if (AvailableGold > 0)
+                {
+                    double curGold = AvailableGold;
+
+                    PlantScheduleFactory2.GameStateCalendar calendar = new PlantScheduleFactory2.GameStateCalendar(NumDays, AvailableTiles, AvailableGold);
+
+                    calendar.GameStates[0] = new PlantScheduleFactory2.GameState() { Wallet = AvailableGold, };
+
+                    for (int day = 1; day <= NumDays; ++day)
+                    {
+                        // Copy game state from previous day
+                        var prevGameState = calendar.GameStates[day - 1];
+                        var curGameState = calendar.GameStates[day] = new PlantScheduleFactory2.GameState();
+
+                        curGameState.Wallet = calendar.GameStates[day - 1].Wallet;
+
+                        foreach (var prevPlantBatch in calendar.GameStates[day - 1].Plants)
+                            curGameState.Plants.Add(new PlantScheduleFactory2.PlantBatch(prevPlantBatch));
+
+                        // Buy day
+                        if (PlantingDays[day])
+                        {
+                            var crop = Schedule.GetCrop(day);
+                            var unitsToPlant = (int)(curGameState.Wallet / Schedule.GetCrop(day).buyPrice);
+                            ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() { unitsToPlant } };
+
+                            // Subtract gold and add plants
+                            curGameState.Wallet = curGameState.Wallet - unitsToPlant * crop.buyPrice;
+                            curGameState.Plants.Add(new PlantScheduleFactory2.PlantBatch(crop, unitsToPlant, day));
+                        }
+                        else
+                        {
+                            var plantsToRemove = new List<PlantScheduleFactory2.PlantBatch>();
+
+                            foreach (var plantBatch in curGameState.Plants)
+                            {
+                                // Sell day
+                                if (plantBatch.HarvestDays.Contains(day))
+                                {
+                                    // Add gold
+                                    var crop = plantBatch.CropType;
+                                    curGameState.Wallet = curGameState.Wallet + plantBatch.Count * crop.sellPrice;
+
+                                    // Subtract plants
+                                    if (!plantBatch.Persistent)
+                                        plantsToRemove.Add(plantBatch);
+                                }
+                            }
+
+                            foreach (var plantToRemove in plantsToRemove)
+                                curGameState.Plants.Remove(plantToRemove);
+                        }
+                    }
+                }
+            }
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Error updating webpage. Exception: {e.Message}");
+            Console.WriteLine($"Error updating webpage. Exception: {e}");
         }
 
         IsBusy = false;
