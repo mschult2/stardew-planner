@@ -53,7 +53,7 @@
         </div>
     </form>
     <br />
-    <button type="button" class="primary-button" @onclick="AddCrop">Add Crop</button>
+    <button type="button" class="primary-button" disabled="@(IsBusy)" @onclick="AddCrop">Add Crop</button>
 </div>
 
 
@@ -73,12 +73,12 @@
                             @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g
                             @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"), Profitability-per-tile: @crop.TPI)
                         </span>
-                        <button type="button" class="delete-btn" @onclick="(() => DeleteCrop(crop))">Delete</button>
+                        <button type="button" class="delete-btn" disabled="@(IsBusy)" @onclick="(() => DeleteCrop(crop))">Delete</button>
                     </div>
                 </li>
             }
         </ul>
-        <button type="button" @onclick="DeleteAllCrops" class="delete-all-btn">Delete All</button>
+        <button type="button" disabled="@(IsBusy)" @onclick="DeleteAllCrops" class="delete-all-btn">Delete All</button>
     }
     else
     {
@@ -117,18 +117,13 @@
 
 <div>
     <h4>Planting Calendar</h4>
-    <button @onclick="GenerateCalendar" class="big-button">Generate Calendar!</button>
-    <div>
-        <p></p>
-
-        <p>This is the planting schedule, with planting days highlighted in green. Harvest days are also marked. Planting days follow harvest days if you're gold-limited, but they fall on the same day if you're tile-limited.</p>
-        <p>An optimal planting choice is indicated for the other days too, in case you acquire some extra gold.</p>
-    </div>
-
+    <button disabled="@(IsBusy)" @onclick="GenerateCalendar" class="big-button">Generate Schedule!</button>
+    <p></p>
     <div>
         @if (Schedule != null)
         {
-            <table class="calendar-table">
+            <div class="calendar-container">
+                <table class="calendar-table">
                 <thead>
                     <tr>
                         <th>Monday</th>
@@ -187,6 +182,16 @@
                     }
                 </tbody>
             </table>
+
+                <!-- Spinner Overlay -->
+                @if (IsBusy)
+                {
+                    <div class="calendar-overlay">
+                        <div class="spinner"></div>
+                        <p style="font-size: 1.5em;" >Loading... Please wait a few seconds</p>
+                    </div>
+                }
+            </div>
         }
         else
         {
@@ -341,6 +346,51 @@
         max-width: 950px; /* Constrain the total width of the container */
     }
 
+    button:disabled,
+    input:disabled {
+        background-color: #aaa; /* Greyed out background */
+        cursor: not-allowed; /* Show a "not allowed" cursor */
+        opacity: 0.6; /* Make it look disabled */
+    }
+
+    /* Calendar container */
+    .calendar-container {
+        position: relative; /* Makes it a positioning context for the overlay */
+        opacity: 1; /* Normal content visibility */
+    }
+
+    /* Overlay */
+    .calendar-overlay {
+        position: absolute; /* Position relative to .calendar-container */
+        top: 0;
+        left: 0;
+        width: 100%; /* Cover the entire calendar */
+        height: 100%; /* Cover the entire calendar */
+        background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background */
+        display: flex; /* Center the spinner and message */
+        flex-direction: column; /* Stack items vertically */
+        justify-content: center;
+        align-items: center;
+        z-index: 10; /* Ensure it appears above calendar content */
+        color: white; /* Text color for the message */
+        text-align: center;
+    }
+
+    /* Spinner */
+    .spinner {
+        border: 13px solid #f3f3f3; /* Light grey */
+        border-top: 10px solid #3498db; /* Blue */
+        border-radius: 50%;
+        width: 130px;
+        height: 130px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px; /* Space between spinner and text */
+    }
+
+    @@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 
 </style>
 
@@ -379,6 +429,7 @@
     private double InvestmentMultiplier;
     private double Profit = -1;
     private bool TileLimited;
+    private bool IsBusy;
 
     protected override void OnInitialized()
     {
@@ -439,65 +490,76 @@
         if (!Crops.Any() || AvailableTiles <= 0 || AvailableGold <= 0)
             return;
 
-        var factory2 = new PlantScheduleFactory2(NumDays);
+        IsBusy = true;
 
-        var profitAndSchedule = await factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
-
-        Profit = profitAndSchedule.Item1;
-        var calendar = profitAndSchedule.Item2;
-
-        // Convert Calendar to Schedule
-        if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
+        try
         {
-            Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
-            for (int day = 1; day <= 28; ++day)
+            var factory2 = new PlantScheduleFactory2(NumDays);
+
+            var profitAndSchedule = await factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
+
+            Profit = profitAndSchedule.Item1;
+            var calendar = profitAndSchedule.Item2;
+
+            // Convert Calendar to Schedule
+            if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
             {
-                var dayState = calendar.GameStates[day];
-
-                // Currently days-of-interest only represent planting paydays (not harvest days)
-                if (dayState.DayOfInterest && dayState.Plants.Count > 0)
+                Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
+                for (int day = 1; day <= 28; ++day)
                 {
-                    Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
+                    var dayState = calendar.GameStates[day];
 
-                    foreach (var batch in dayState.Plants)
+                    // Currently days-of-interest only represent planting paydays (not harvest days)
+                    if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                     {
-                        if (batch.PlantDay == day && batch.Count > 0)
+                        Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
+
+                        foreach (var batch in dayState.Plants)
                         {
-                            PlantingDays[day] = true;
+                            if (batch.PlantDay == day && batch.Count > 0)
+                            {
+                                PlantingDays[day] = true;
 
-                            Schedule.AddCrop(day, batch.CropType);
+                                Schedule.AddCrop(day, batch.CropType);
 
-                            if (ScheduleDetails[day] == null)
-                                ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
+                                if (ScheduleDetails[day] == null)
+                                    ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
 
-                            ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
+                                ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
 
-                            foreach (int harvestDay in batch.HarvestDays)
-                                HarvestDays[harvestDay] = true;
+                                foreach (int harvestDay in batch.HarvestDays)
+                                    HarvestDays[harvestDay] = true;
+                            }
                         }
                     }
                 }
             }
+
+            // var factory = new PlantScheduleFactory(NumDays);
+
+            // InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
+            // Schedule = bestSchedule;
+
+            // // Get the planting days
+            // try
+            // {
+            //     factory.GetPlantingDays(out PlantingDays, out HarvestDays);
+            // }
+            // catch (IndexOutOfRangeException ex)
+            // {
+            //     Console.WriteLine($"IndexOutOfRangeException error generating planting days: {ex.Message}");
+            // }
+            // catch (Exception ex)
+            // {
+            //     Console.WriteLine($"Error generating planting days: {ex.Message}");
+            // }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Error updating webpage. Exception: {e.Message}");
         }
 
-        // var factory = new PlantScheduleFactory(NumDays);
-
-        // InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
-        // Schedule = bestSchedule;
-
-        // // Get the planting days
-        // try
-        // {
-        //     factory.GetPlantingDays(out PlantingDays, out HarvestDays);
-        // }
-        // catch (IndexOutOfRangeException ex)
-        // {
-        //     Console.WriteLine($"IndexOutOfRangeException error generating planting days: {ex.Message}");
-        // }
-        // catch (Exception ex)
-        // {
-        //     Console.WriteLine($"Error generating planting days: {ex.Message}");
-        // }
+        IsBusy = false;
 
         StateHasChanged();
     }
