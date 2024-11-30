@@ -92,94 +92,93 @@
 
 <div>
     <h4>Planting Schedule</h4>
-    
+
     <!-- Generate Schedule button -->
     <button disabled="@(IsBusy)" @onclick="GenerateCalendar" class="big-button">Generate Schedule!</button>
-
-    <!-- Profit -->
-    <div></div>
-
-    <div>
-        @if (Profit >= 0 && Schedule != null)
-        {
-            <p><strong>Profit: @Profit.ToString("N0") gold</strong></p>
-        }
-        else
-        {
-            <p><strong>Profit: N/A</strong></p>
-        }
-    </div>
 
     <!-- Calendar -->
     <div>
         @if (Schedule != null)
         {
-            <div class="calendar-container">
-                <table class="calendar-table">
-                <thead>
-                    <tr>
-                        <th>Monday</th>
-                        <th>Tuesday</th>
-                        <th>Wednesday</th>
-                        <th>Thursday</th>
-                        <th>Friday</th>
-                        <th>Saturday</th>
-                        <th>Sunday</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (int week = 0; week < 4; week++) // 4 weeks
-                    {
+                <div class="calendar-container">
+
+                    <!-- Profit -->
+                    <div class="profit-overlay">
+                        @if (Profit >= 0 && Schedule != null)
+                        {
+                            <p><strong>Profit: @Profit.ToString("N0") gold</strong></p>
+                        }
+                        else
+                        {
+                            <p><strong>Profit: N/A</strong></p>
+                        }
+                    </div>
+
+                    <table class="calendar-table">
+                    <thead>
                         <tr>
-                            @for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) // 7 days in a week
-                            {
-                                int day = week * 7 + dayOfWeek;
-                                var crops = Schedule.GetCrops(day);
-                                var plantingDetails = ScheduleDetails != null && ScheduleDetails.Length > day ? ScheduleDetails[day] : null;
-                                var plantingDay = PlantingDays[day] && crops != null && crops.Count > 0;
+                            <th>Monday</th>
+                            <th>Tuesday</th>
+                            <th>Wednesday</th>
+                            <th>Thursday</th>
+                            <th>Friday</th>
+                            <th>Saturday</th>
+                            <th>Sunday</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int week = 0; week < 4; week++) // 4 weeks
+                        {
+                            <tr>
+                                @for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) // 7 days in a week
+                                {
+                                    int day = week * 7 + dayOfWeek;
+                                    var crops = Schedule.GetCrops(day);
+                                    var plantingDetails = ScheduleDetails != null && ScheduleDetails.Length > day ? ScheduleDetails[day] : null;
+                                    var plantingDay = PlantingDays[day] && crops != null && crops.Count > 0;
 
-                                // Determine the class for planting day
-                                string cellClass = plantingDay ? "planting-day" : "";
+                                    // Determine the class for planting day
+                                    string cellClass = plantingDay ? "planting-day" : "";
 
-                                    <td class="@cellClass">
-                                    <div style="position: relative;">
-                                        @if (HarvestDays[day])
-                                        {
-                                            <span class="harvest-marker">Harvest</span>
-                                        }
-                                        <div><strong>@($"Day {day}{(plantingDay ? " - Plant" : "")}")</strong></div>
-
-                                        @if (crops != null && crops.Count > 0)
-                                        {
-                                            @for (int cropIndex = 0; cropIndex < crops.Count; ++cropIndex)
+                                        <td class="@cellClass">
+                                        <div style="position: relative;">
+                                            @if (HarvestDays[day])
                                             {
-                                                @if (plantingDetails != null && plantingDetails.cropsNumberToPlant != null && plantingDetails.cropsNumberToPlant.Count > cropIndex && plantingDetails.cropsNumberToPlant[cropIndex] > 0)
+                                                <span class="harvest-marker">Harvest</span>
+                                            }
+                                            <div><strong>@($"Day {day}{(plantingDay ? " - Plant" : "")}")</strong></div>
+
+                                            @if (crops != null && crops.Count > 0)
+                                            {
+                                                @for (int cropIndex = 0; cropIndex < crops.Count; ++cropIndex)
                                                 {
-                                                    <div>@($"{crops[cropIndex]} ({plantingDetails.cropsNumberToPlant[cropIndex]})")</div>
-                                                }
-                                                else
-                                                {
-                                                    <div>@($"{crops[cropIndex]}")</div>
+                                                    @if (plantingDetails != null && plantingDetails.cropsNumberToPlant != null && plantingDetails.cropsNumberToPlant.Count > cropIndex && plantingDetails.cropsNumberToPlant[cropIndex] > 0)
+                                                    {
+                                                        <div>@($"{crops[cropIndex]} ({plantingDetails.cropsNumberToPlant[cropIndex]})")</div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div>@($"{crops[cropIndex]}")</div>
+                                                    }
                                                 }
                                             }
-                                        }
-                                    </div>
-                                </td>
-                            }
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                                        </div>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
 
-                <!-- Spinner Overlay -->
-                @if (IsBusy)
-                {
-                    <div class="calendar-overlay">
-                        <div class="spinner"></div>
-                        <p style="font-size: 1.25em;" >Loading... Please wait a few seconds</p>
-                    </div>
-                }
-            </div>
+                    <!-- Spinner Overlay -->
+                    @if (IsBusy)
+                    {
+                        <div class="calendar-overlay">
+                            <div class="spinner"></div>
+                            <p style="font-size: 1.25em;" >Running simulation... Please wait a few seconds</p>
+                        </div>
+                    }
+                </div>
         }
         else
         {
@@ -192,6 +191,7 @@
 </div>
 
 <style>
+
     .primary-button {
         background-color: #2196f3; /* Blue */
         margin-top: 10px;
@@ -209,6 +209,7 @@
     .big-button {
         background-color: #2196f3; /* Blue */
         margin-top: 10px;
+        margin-bottom: 50px; /* Add space below the button */
         color: white;
         border: none;
         padding: 13px 19.5px;
@@ -220,6 +221,19 @@
         .big-button:hover {
             background-color: #0a65ad;
         }
+
+    .profit-overlay {
+        position: absolute; /* Position relative to the calendar-wrapper */
+        top: -4%; /* Center vertically */
+        left: 50%; /* Center horizontally */
+        transform: translate(-50%, -50%); /* Adjust position to center */
+        padding: 10px 20px; /* Add padding for better visibility */
+        border-radius: 5px; /* Optional: Rounded corners */
+        text-align: center; /* Center the text inside the overlay */
+        z-index: 10; /* Ensure it appears above the calendar */
+        font-size: 1.2em; /* Adjust font size as needed */
+        font-weight: bold; /* Make the text stand out */
+    }
 
     /* Calendar container */
     .calendar-container {
