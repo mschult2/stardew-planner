@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace StardewCropCalculatorLibrary
 {
@@ -154,6 +155,9 @@ namespace StardewCropCalculatorLibrary
 
         private readonly List<Crop> Crops = new List<Crop>();
 
+        private int numOperationsStat = 0;
+        private int numCacheHitsStat = 0;
+
         public GameStateCalendarFactory(int numDays, List<Crop> crops)
         {
             NumDays = numDays;
@@ -166,10 +170,12 @@ namespace StardewCropCalculatorLibrary
         public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int day, List<Crop> crops, int availableTiles, double availableGold)
         {
             answerCache.Clear();
+            numOperationsStat = 0;
+            numCacheHitsStat = 0;
 
             // If tiles are infinite but gold is still finite, then we can still calculate finite end wealth.
             if (availableTiles <= 0)
-                availableTiles = 1000000000;
+                availableTiles = -1;
 
             var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
@@ -180,6 +186,8 @@ namespace StardewCropCalculatorLibrary
 
             var wealth = await GetMostProfitableCropRecursive(day, crops, cheapestCrop.buyPrice, calendar);
 
+            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
+
             return Tuple.Create(wealth, calendar);
         }
 
@@ -189,6 +197,8 @@ namespace StardewCropCalculatorLibrary
         private async Task<double> GetMostProfitableCropRecursive(int day, List<Crop> crops, double goldLowerLimit, GameStateCalendar calendar)
         {
             await Task.Yield();
+
+            ++numOperationsStat;
 
             double bestWealth = 0;
             GameStateCalendar bestCalendar = null;
@@ -210,6 +220,7 @@ namespace StardewCropCalculatorLibrary
                         {
                             if (wealthSchedulePair.Item2 != null)
                             {
+                                ++numCacheHitsStat;
                                 calendar.Merge(wealthSchedulePair.Item2, day);
                                 return wealthSchedulePair.Item1;
                             }
@@ -225,7 +236,7 @@ namespace StardewCropCalculatorLibrary
 
                 // Calculate number of units to plant.
                 int unitsCanAfford = ((int)(availableGold / crop.buyPrice));
-                bool goldLimited = availableTiles >= unitsCanAfford;
+                bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
                 int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
 
                 // Short-circuit number of units if too close to end of month for it to make money.
@@ -244,7 +255,8 @@ namespace StardewCropCalculatorLibrary
                     double sale = unitsToPlant * crop.sellPrice;
 
                     localCalendar.GameStates[day].Wallet = localCalendar.GameStates[day].Wallet - cost;
-                    localCalendar.GameStates[day].FreeTiles = localCalendar.GameStates[day].FreeTiles - unitsToPlant;
+                    if (availableTiles != -1)
+                        localCalendar.GameStates[day].FreeTiles = localCalendar.GameStates[day].FreeTiles - unitsToPlant;
                     localCalendar.GameStates[day].DayOfInterest = true;
 
                     PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day);
@@ -267,7 +279,9 @@ namespace StardewCropCalculatorLibrary
                             if (curUnits > 0)
                             {
                                 localCalendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
-                                localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
+
+                                if (availableTiles != -1)
+                                    localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
                             }
 
                             // Modify gold
@@ -283,7 +297,9 @@ namespace StardewCropCalculatorLibrary
                             // Decrease tiles if not dead
                             if (curUnits > 0)
                             {
-                                localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
+                                if (availableTiles != -1)
+                                    localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
+
                                 localCalendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
                             }
 
@@ -301,7 +317,7 @@ namespace StardewCropCalculatorLibrary
                         // TODO: experiment with increasing these limits to avoid time-consuming trivial purchases.
                         // For some reason, raising the tile limit in my last test CAUSED trivial purchases. (Otherwise correct with no perf change) (1000g, inf tiles)
                         // Raising gold thresh caused a perf decrease. (Otherwise correct, and no interstitial purchases)
-                        if (localCalendar.GameStates[j].Wallet > 0 && localCalendar.GameStates[j].FreeTiles > 0)
+                        if (localCalendar.GameStates[j].Wallet > 0 && (localCalendar.GameStates[j].FreeTiles > 0 || localCalendar.GameStates[j].FreeTiles == -1))
                         {
                             await GetMostProfitableCropRecursive(j, crops, 0, localCalendar);
                             break;
@@ -359,25 +375,25 @@ namespace StardewCropCalculatorLibrary
             return Math.Round(value / scale) * scale;
         }
 
-        /// <summary>
-        /// The current value of the state of the farm, including gold and crops.
-        /// </summary>
-        private static double MyCurrentValue(GameState currentGameState)
-        {
-            double curValue = currentGameState.Wallet;
+        ///// <summary>
+        ///// The current value of the state of the farm, including gold and crops.
+        ///// </summary>
+        //private static double MyCurrentValue(GameState currentGameState)
+        //{
+        //    double curValue = currentGameState.Wallet;
 
-            if (currentGameState.Plants != null)
-            {
-                foreach (var plantBatch in currentGameState.Plants)
-                {
-                    // Don't know how far along investment is, so assume original/lowest value to be safe.
-                    if (plantBatch != null && plantBatch.Count > 0)
-                        curValue += plantBatch.Count * plantBatch.CropType.buyPrice;
-                }
-            }
+        //    if (currentGameState.Plants != null)
+        //    {
+        //        foreach (var plantBatch in currentGameState.Plants)
+        //        {
+        //            // Don't know how far along investment is, so assume original/lowest value to be safe.
+        //            if (plantBatch != null && plantBatch.Count > 0)
+        //                curValue += plantBatch.Count * plantBatch.CropType.buyPrice;
+        //        }
+        //    }
 
-            return curValue;
-        }
+        //    return curValue;
+        //}
 
         /// <summary>
         /// Serialize game state from the startingDay onward.
@@ -403,5 +419,37 @@ namespace StardewCropCalculatorLibrary
 
             return serializedInputGameStateSb.ToString();
         }
+
+        private static List<int> GetHarvestDays(int plantDay, Crop crop)
+        {
+            List<int> harvestDays = new List<int>();
+
+            int harvestDate = plantDay + crop.timeToMaturity;
+
+            if (harvestDate <= 28)
+                harvestDays.Add(harvestDate);
+            else
+                return harvestDays;
+
+            while (harvestDate + crop.yieldRate <= 28)
+            {
+                harvestDate += crop.yieldRate;
+                harvestDays.Add(harvestDate);
+            }
+
+            return harvestDays;
+        }
+
+        /// <summary>
+        /// Serializes current game state calendar, so it can be used as a unique key.
+        /// </summary>
+        /// <param name="day"></param>
+        /// <param name="calendar"></param>
+        /// <returns></returns>
+        private static string GenerateHashKey(int day, GameStateCalendar calendar)
+        {
+            return $"{day}_{calendar.GameStates[day].Wallet}_{calendar.GameStates[day].FreeTiles}";
+        }
+
     }
 }
