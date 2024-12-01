@@ -49,7 +49,7 @@
         <div class="form-row">
             <label>Total Sell Price:</label>
             <input type="number" @bind="NewCropSellPrice" />
-            <span>(account for plants that yield multiple fruits/veggies in one harvest, like blueberries)</span>
+            <span>(account for multiple fruits/veggies in one harvest. example: blueberries are 50g x 3 = 150g)</span>
         </div>
     </form>
     <br />
@@ -69,7 +69,7 @@
                     <div class="crop-content">
                         <span>
                             @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g
-                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"), Profitability-per-tile: @crop.TPI)
+                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"))
                         </span>
                         <button type="button" class="delete-btn" disabled="@(IsBusy)" @onclick="(() => DeleteCrop(crop))">Delete</button>
                     </div>
@@ -180,7 +180,7 @@
                     {
                         <div class="calendar-overlay">
                             <div class="spinner"></div>
-                            <p style="font-size: 1.25em;" >Running simulation... Please wait a few seconds</p>
+                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 30 seconds</p>
                         </div>
                     }
                 </div>
@@ -359,7 +359,7 @@
         grid-template-columns: auto 120px; /* Text takes remaining space; button fixed width */
         align-items: center; /* Vertically align items */
         gap: 10px; /* Add spacing between text and button */
-        max-width: 950px; /* Constrain the total width of the container */
+        max-width: 800px; /* Constrain the total width of the container */
     }
 
     button:disabled,
@@ -444,19 +444,7 @@
         }
     }
 
-    // Input properties for a new crop
-    private string NewCropName = string.Empty;
-    private int NewCropTimeToMaturity;
-    private int NewCropYieldRate;
-    private double NewCropBuyPrice;
-    private double NewCropSellPrice;
-
-    // Settings for gold and tiles
-    private double AvailableGold = 5000;
-    private int AvailableTiles = 100;
-
-    // Default crop list
-    private List<Crop> Crops = new()
+    private static readonly List<Crop> DefaultCrops = new ()
     {
         new Crop("Blueberry", 13, 4, 80, 150),
         new Crop("Hot Pepper", 5, 3, 40, 40),
@@ -471,10 +459,26 @@
 
         // new Crop("Blueberry", 13, 4, 80, 150),
         // new Crop("Hot Pepper", 5, 3, 40, 40),
-        // new Crop("Radish", 6, 1000, 40, 90),
+        // new Crop("Melon", 12, 1000, 80, 250),
+        // new Crop("Hops", 11, 1, 60, 25),
+        // new Crop("Tomato", 11, 4, 50, 60),
     };
 
-    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(NumDays);
+    // Input properties for a new crop
+    private string NewCropName = string.Empty;
+    private int NewCropTimeToMaturity;
+    private int NewCropYieldRate;
+    private double NewCropBuyPrice;
+    private double NewCropSellPrice;
+
+    // Settings for gold and tiles
+    private double AvailableGold = 5000;
+    private int AvailableTiles = 100;
+
+    // Default crop list
+    private List<Crop> Crops = new List<Crop>(DefaultCrops);
+
+    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(NumDays, DefaultCrops);
 
     private PlantSchedule Schedule = new(NumDays);
     private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
@@ -499,7 +503,9 @@
     // Add a new crop to the list
     private void AddCrop()
     {
-        if (!string.IsNullOrWhiteSpace(NewCropName))
+        if (!string.IsNullOrWhiteSpace(NewCropName)
+        && NewCropSellPrice > 0 && NewCropBuyPrice > 0 && NewCropTimeToMaturity > 0 && NewCropYieldRate >= 0
+        && NewCropTimeToMaturity < NumDays && NewCropYieldRate < NumDays)
         {
             int processedYieldRate = NewCropYieldRate;
 
@@ -514,6 +520,8 @@
             NewCropYieldRate = 0;
             NewCropBuyPrice = 0;
             NewCropSellPrice = 0;
+
+            calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
         }
     }
 
@@ -521,6 +529,7 @@
     private void DeleteCrop(Crop crop)
     {
         Crops.Remove(crop);
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
     }
 
     // Delete all crops
@@ -528,6 +537,7 @@
     {
         Crops.Clear();
         ClearSchedule();
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
     }
 
     private void ClearSchedule()
@@ -539,7 +549,6 @@
         InvestmentMultiplier = -1;
         Profit = -1;
     }
-
 
     // Generate the planting schedule
     private async void GenerateCalendar()

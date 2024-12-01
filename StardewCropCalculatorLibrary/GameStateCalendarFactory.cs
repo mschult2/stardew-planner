@@ -139,16 +139,25 @@ namespace StardewCropCalculatorLibrary
     public class GameStateCalendarFactory
     {
         // GameState cache
-        private readonly Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>> answerCache = new Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>>();
+        private readonly Dictionary<int, Dictionary<double, Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>>> answerCache
+            = new Dictionary<int, Dictionary<double, Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>>>();
 
         /// <summary> Percentage of total wealth that must be met in order to bother investing a certain amount of money. </summary>
         private static readonly double InvestmentThreshold = 0.05;
 
+        /// <summary> Percentage of farm size that must be available in order to bother trying to invest. </summary>
+        private static readonly double TileThreshold = 0.05;
+
+        private static readonly int SignificantDigits = 2;
+
         private int NumDays;
 
-        public GameStateCalendarFactory(int numDays)
+        private readonly List<Crop> Crops = new List<Crop>();
+
+        public GameStateCalendarFactory(int numDays, List<Crop> crops)
         {
             NumDays = numDays;
+            Crops = crops;
         }
 
         /// <summary>
@@ -156,6 +165,8 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int day, List<Crop> crops, int availableTiles, double availableGold)
         {
+            answerCache.Clear();
+
             // If tiles are infinite but gold is still finite, then we can still calculate finite end wealth.
             if (availableTiles <= 0)
                 availableTiles = 1000000000;
@@ -189,14 +200,19 @@ namespace StardewCropCalculatorLibrary
             // Check cache for quick answer
             if (answerCache != null && answerCache.TryGetValue(day, out var goldDict))
             {
-                if (goldDict != null && goldDict.TryGetValue(RoundToSignificantDigits(availableGold, 2), out var tileDict))
+                if (goldDict != null && goldDict.TryGetValue(RoundToSignificantDigits(availableGold), out var tileDict))
                 {
-                    if (tileDict != null && tileDict.TryGetValue((int)RoundToSignificantDigits((double)availableTiles, 2), out var wealthSchedulePair))
+                    if (tileDict != null && tileDict.TryGetValue((int)RoundToSignificantDigits(availableTiles), out var gameStateDict))
                     {
-                        if (wealthSchedulePair.Item2 != null)
+                        string serializedInputGameState = SerializeGameStateCalendar(day, calendar);
+
+                        if (gameStateDict != null && gameStateDict.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
                         {
-                            calendar.Merge(wealthSchedulePair.Item2, day);
-                            return wealthSchedulePair.Item1;
+                            if (wealthSchedulePair.Item2 != null)
+                            {
+                                calendar.Merge(wealthSchedulePair.Item2, day);
+                                return wealthSchedulePair.Item1;
+                            }
                         }
                     }
                 }
@@ -279,11 +295,15 @@ namespace StardewCropCalculatorLibrary
                     for (int j = day + 1; j <= numDays; ++j)
                     {
                         // Base case: raise investment threshold the richer we get, to avoid complicating schedule with trivial investments
-                        goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(localCalendar.GameStates[j]), goldLowerLimit);
 
-                        if (localCalendar.GameStates[j].Wallet >= goldLowerLimit && localCalendar.GameStates[j].FreeTiles > 0)
+                        //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(localCalendar.GameStates[j]), goldLowerLimit);
+
+                        // TODO: experiment with increasing these limits to avoid time-consuming trivial purchases.
+                        // For some reason, raising the tile limit in my last test CAUSED trivial purchases. (Otherwise correct with no perf change) (1000g, inf tiles)
+                        // Raising gold thresh caused a perf decrease. (Otherwise correct, and no interstitial purchases)
+                        if (localCalendar.GameStates[j].Wallet > 0 && localCalendar.GameStates[j].FreeTiles > 0)
                         {
-                            await GetMostProfitableCropRecursive(j, crops, goldLowerLimit, localCalendar);
+                            await GetMostProfitableCropRecursive(j, crops, 0, localCalendar);
                             break;
                         }
                     }
@@ -300,15 +320,24 @@ namespace StardewCropCalculatorLibrary
             }
 
             // Update cache if the real deal
-            double goldRounded = RoundToSignificantDigits(availableGold, 2);
-            int tilesRounded = (int)RoundToSignificantDigits((int)availableTiles, 2);
+            double goldRounded = RoundToSignificantDigits(availableGold);
+            int tilesRounded = (int)RoundToSignificantDigits(availableTiles);
 
             if (!answerCache.ContainsKey(day))
-                answerCache[day] = new Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>();
+                answerCache[day] = new Dictionary<double, Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>>();
             if (!answerCache[day].ContainsKey(goldRounded))
-                answerCache[day][goldRounded] = new Dictionary<int, Tuple<double, GameStateCalendar>>();
-            if (!answerCache[day][goldRounded].ContainsKey(tilesRounded) || bestWealth > answerCache[day][goldRounded][tilesRounded].Item1)
-                answerCache[day][goldRounded][tilesRounded] = Tuple.Create(bestWealth, bestCalendar);
+                answerCache[day][goldRounded] = new Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>();
+            if (!answerCache[day][goldRounded].ContainsKey(tilesRounded))
+            {
+                answerCache[day][goldRounded][tilesRounded] = new Dictionary<string, Tuple<double, GameStateCalendar>>();
+
+                // Cached gamestate is also defined by its future payment plan, BEFORE we modifie it by choosing to plant something today.
+                // In other words, one of the inputs to this method which we must use as a key is the previous gamestate, but just the future days.
+                string serializedInputGameState = SerializeGameStateCalendar(day, calendar);
+
+                if (!answerCache[day][goldRounded][tilesRounded].ContainsKey(serializedInputGameState) || bestWealth > answerCache[day][goldRounded][tilesRounded][serializedInputGameState].Item1)
+                    answerCache[day][goldRounded][tilesRounded][serializedInputGameState] = Tuple.Create(bestWealth, bestCalendar);
+            }
 
             if (bestCalendar != null)
                 calendar.Merge(bestCalendar, day);
@@ -320,12 +349,13 @@ namespace StardewCropCalculatorLibrary
         /// Round a value to a given number of significant digits.
         /// Example: If 2 sig digits, 23,343 becomes 23,000. 563 becomes 560.
         /// </summary>
-        private static double RoundToSignificantDigits(double value, int significantDigits)
+        private static double RoundToSignificantDigits(double value)
         {
             if (value == 0)
                 return 0;
 
-            double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(value))) - (significantDigits - 1));
+            double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(value))) - (SignificantDigits - 1));
+
             return Math.Round(value / scale) * scale;
         }
 
@@ -347,6 +377,31 @@ namespace StardewCropCalculatorLibrary
             }
 
             return curValue;
+        }
+
+        /// <summary>
+        /// Serialize game state from the startingDay onward.
+        /// </summary>
+        private static string SerializeGameStateCalendar(int startingDay, GameStateCalendar calendar)
+        {
+            StringBuilder serializedInputGameStateSb = new StringBuilder();
+
+            for (int i = startingDay; i <= calendar.NumDays + 1; ++i)
+            {
+                var inputGameStateDay = calendar.GameStates[i];
+
+                if (inputGameStateDay.DayOfInterest)
+                {
+                    serializedInputGameStateSb.Append(i.ToString());
+                    serializedInputGameStateSb.Append(", ");
+                    serializedInputGameStateSb.Append(RoundToSignificantDigits(inputGameStateDay.Wallet).ToString());
+                    serializedInputGameStateSb.Append(", ");
+                    serializedInputGameStateSb.Append(RoundToSignificantDigits(inputGameStateDay.FreeTiles).ToString());
+                    serializedInputGameStateSb.Append("; ");
+                }
+            }
+
+            return serializedInputGameStateSb.ToString();
         }
     }
 }
