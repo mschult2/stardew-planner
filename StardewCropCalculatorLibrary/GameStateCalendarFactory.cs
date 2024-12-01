@@ -8,126 +8,136 @@ using System.Threading.Tasks;
 
 namespace StardewCropCalculatorLibrary
 {
-    internal class PlantScheduleFactory2
+    /// <summary> The state of our farm on every day. </summary>
+    public class GameStateCalendar
     {
-        /// <summary> The state of our farm on every day. </summary>
-        public class GameStateCalendar
+        public int NumDays;
+
+        /// <summary> The state of our farm on a particular day. Ie, how many plants, free tiles, and gold we have. </summary>
+        public readonly SortedDictionary<int, GameState> GameStates = new SortedDictionary<int, GameState>();
+
+        public GameStateCalendar(int numDays, int availableTiles, double availableGold)
         {
-            public int NumDays;
+            NumDays = numDays;
 
-            /// <summary> The state of our farm on a particular day. Ie, how many plants, free tiles, and gold we have. </summary>
-            public readonly SortedDictionary<int, GameState> GameStates = new SortedDictionary<int, GameState>();
-
-            public GameStateCalendar(int numDays, int availableTiles, double availableGold)
+            // Adding one more day in case a crop is harvested on the last day.
+            // In this case, we don't get our payday until the following day. So technically
+            // that following day may have a state we care about, ie a larger balance.
+            for (int i = 1; i <= numDays + 1; ++i)
             {
-                NumDays = numDays;
-
-                // Adding one more day in case a crop is harvested on the last day.
-                // In this case, we don't get our payday until the following day. So technically
-                // that following day may have a state we care about, ie a larger balance.
-                for (int i = 1; i <= numDays + 1; ++i)
-                {
-                    GameStates.Add(i, new GameState());
-                    GameStates[i].Wallet = availableGold;
-                    GameStates[i].FreeTiles = availableTiles;
-                }
-            }
-
-            public GameStateCalendar(GameStateCalendar otherCalendar)
-            {
-                NumDays = otherCalendar.NumDays;
-
-                for (int i = 1; i <= NumDays + 1; ++i)
-                    GameStates.Add(i, new GameState());
-
-                Merge(otherCalendar, 1);
-            }
-
-            public void Merge(GameStateCalendar otherCalendar, int otherStartingDay)
-            {
-                for(int i = otherStartingDay; i <= NumDays + 1; ++i)
-                {
-                    GameStates[i].Wallet = otherCalendar.GameStates[i].Wallet;
-                    GameStates[i].FreeTiles = otherCalendar.GameStates[i].FreeTiles;
-                    GameStates[i].DayOfInterest = otherCalendar.GameStates[i].DayOfInterest;
-
-                    GameStates[i].Plants.Clear();
-
-                    foreach (PlantBatch otherPlantBatch in otherCalendar.GameStates[i].Plants)
-                        GameStates[i].Plants.Add(new PlantBatch(otherPlantBatch));
-                }
+                GameStates.Add(i, new GameState());
+                GameStates[i].Wallet = availableGold;
+                GameStates[i].FreeTiles = availableTiles;
             }
         }
 
-        /// <summary> The state of our farm on a given day. </summary>
-        public class GameState
+        public GameStateCalendar(GameStateCalendar otherCalendar)
         {
-            /// <summary>  How much gold we have. </summary>
-            public double Wallet = 0;
+            NumDays = otherCalendar.NumDays;
 
-            /// <summary>  How many free tiles we have. </summary>
-            public int FreeTiles = 0;
+            for (int i = 1; i <= NumDays + 1; ++i)
+                GameStates.Add(i, new GameState());
 
-            /// <summary> Crops currently planted on the farm. Crops are grouped by batch. </summary>
-            public readonly List<PlantBatch> Plants = new List<PlantBatch>();
+            Merge(otherCalendar, 1);
+        }
 
-            /// <summary>  Something happens on this day - either we get more gold, or more tiles. </summary>
-            public bool DayOfInterest = false;
-
-            public override string ToString()
+        public void Merge(GameStateCalendar otherCalendar, int otherStartingDay)
+        {
+            for (int i = otherStartingDay; i <= NumDays + 1; ++i)
             {
-                string plantsDescription = "";
-                foreach (var batch in Plants)
-                    plantsDescription += $"{batch.CropType.name}: {batch.Count}, ";
+                GameStates[i].Wallet = otherCalendar.GameStates[i].Wallet;
+                GameStates[i].FreeTiles = otherCalendar.GameStates[i].FreeTiles;
+                GameStates[i].DayOfInterest = otherCalendar.GameStates[i].DayOfInterest;
 
-                return $"{plantsDescription}available tiles: {FreeTiles}, available gold: {Wallet}";
+                GameStates[i].Plants.Clear();
+
+                foreach (PlantBatch otherPlantBatch in otherCalendar.GameStates[i].Plants)
+                    GameStates[i].Plants.Add(new PlantBatch(otherPlantBatch));
+            }
+        }
+    }
+
+    /// <summary> The state of our farm on a given day. </summary>
+    public class GameState
+    {
+        /// <summary>  How much gold we have. </summary>
+        public double Wallet = 0;
+
+        /// <summary>  How many free tiles we have. </summary>
+        public int FreeTiles = 0;
+
+        /// <summary> Crops currently planted on the farm. Crops are grouped by batch. </summary>
+        public readonly List<PlantBatch> Plants = new List<PlantBatch>();
+
+        /// <summary>  Something happens on this day - either we get more gold, or more tiles. </summary>
+        public bool DayOfInterest = false;
+
+        public override string ToString()
+        {
+            string plantsDescription = "";
+            foreach (var batch in Plants)
+                plantsDescription += $"{batch.CropType.name}: {batch.Count}, ";
+
+            return $"{plantsDescription}available tiles: {FreeTiles}, available gold: {Wallet}";
+        }
+    }
+
+    /// <summary>
+    /// A batch of crops planted on our farm. All one type, all planted at the same time.
+    /// A batch can be treated as one super-plant harvested all at once.
+    /// </summary>
+    public class PlantBatch
+    {
+        public Crop CropType = null;
+        public int Count = 0;
+        public readonly SortedSet<int> HarvestDays = new SortedSet<int>();
+        public bool Persistent => IsPersistent(CropType);
+
+        public int PlantDay;
+
+        public PlantBatch(Crop cropType, int cropCount, int plantDay)
+        {
+            CropType = cropType;
+            Count = cropCount;
+            PlantDay = plantDay;
+
+            int harvestDate = plantDay + cropType.timeToMaturity;
+
+            if (harvestDate <= 28)
+                HarvestDays.Add(harvestDate);
+            else
+                return;
+
+            while (harvestDate + cropType.yieldRate <= 28)
+            {
+                harvestDate += cropType.yieldRate;
+                HarvestDays.Add(harvestDate);
             }
         }
 
-        /// <summary>
-        /// A batch of crops planted on our farm. All one type, all planted at the same time.
-        /// A batch can be treated as one super-plant harvested all at once.
-        /// </summary>
-        public class PlantBatch
+        public PlantBatch(PlantBatch otherPlantBatch)
         {
-            public Crop CropType = null;
-            public int Count = 0;
-            public readonly SortedSet<int> HarvestDays = new SortedSet<int>();
-            public bool Persistent => IsPersistent(CropType);
+            CropType = otherPlantBatch.CropType;
+            Count = otherPlantBatch.Count;
+            PlantDay = otherPlantBatch.PlantDay;
 
-            public int PlantDay;
-
-            public PlantBatch(Crop cropType, int cropCount, int plantDay)
-            {
-                CropType = cropType;
-                Count = cropCount;
-                PlantDay = plantDay;
-
-                int harvestDate = plantDay + cropType.timeToMaturity;
-
-                if (harvestDate <= 28)
-                    HarvestDays.Add(harvestDate);
-                else
-                    return;
-
-                while (harvestDate + cropType.yieldRate <= 28)
-                {
-                    harvestDate += cropType.yieldRate;
-                    HarvestDays.Add(harvestDate);
-                }
-            }
-
-            public PlantBatch(PlantBatch otherPlantBatch)
-            {
-                CropType = otherPlantBatch.CropType;
-                Count = otherPlantBatch.Count;
-                PlantDay = otherPlantBatch.PlantDay;
-
-                foreach (int otherHarvestDay in otherPlantBatch.HarvestDays)
-                    HarvestDays.Add(otherHarvestDay);
-            }
+            foreach (int otherHarvestDay in otherPlantBatch.HarvestDays)
+                HarvestDays.Add(otherHarvestDay);
         }
 
+        private static bool IsPersistent(Crop crop)
+        {
+            // TODO: input numDays
+            return crop.yieldRate > 0 && crop.yieldRate < 28;
+        }
+    }
+
+    /// <summary>
+    /// This scheduler algorithm is an approximate gamestate simulation. Thus it runs slow.
+    /// The benefit is it can deal with limited tiles, or any input.
+    /// </summary>
+    public class GameStateCalendarFactory
+    {
         // GameState cache
         private readonly Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>> answerCache = new Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>>();
 
@@ -136,7 +146,7 @@ namespace StardewCropCalculatorLibrary
 
         private int NumDays;
 
-        public PlantScheduleFactory2(int numDays)
+        public GameStateCalendarFactory(int numDays)
         {
             NumDays = numDays;
         }
@@ -304,12 +314,6 @@ namespace StardewCropCalculatorLibrary
                 calendar.Merge(bestCalendar, day);
 
             return bestWealth;
-        }
-
-        private static bool IsPersistent(Crop crop)
-        {
-            // TODO: input numDays
-            return crop.yieldRate > 0 && crop.yieldRate < 28;
         }
 
         /// <summary>

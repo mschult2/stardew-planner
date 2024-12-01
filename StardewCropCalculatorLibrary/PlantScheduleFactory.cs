@@ -11,6 +11,9 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace StardewCropCalculatorLibrary
 {
+    /// <summary>
+    /// This scheduler algorithm is a mathematical ROI function. It's fast, but can't deal with limited tiles. It assumes all gold is invested and multipled.
+    /// </summary>
     public class PlantScheduleFactory
     {
         /// <summary>
@@ -141,77 +144,6 @@ namespace StardewCropCalculatorLibrary
 
                 ++day;
             }
-        }
-    }
-
-    /// <summary>
-    /// A single instance of a plant in the flat profit calculator simulation.
-    /// </summary>
-    public class Plant
-    {
-        public Crop Crop;
-        public List<int> HarvestDays;
-        public bool Persistent => HarvestDays.Count > 1;
-
-        public Plant(Crop crop, int dayItWasPlanted, int maxDays, int daysToMaturity, int daysBetweenHarvests)
-        {
-            Crop = crop;
-
-            HarvestDays = new List<int>();
-
-            int harvestDate = dayItWasPlanted + daysToMaturity;
-            HarvestDays.Add(harvestDate);
-
-            while ((harvestDate + daysBetweenHarvests) <= maxDays)
-            {
-                harvestDate += daysBetweenHarvests;
-                HarvestDays.Add(harvestDate);
-            }
-        }
-
-        public override string ToString()
-        {
-            //return $"{Crop.name}: blooms on {string.Join(", ", HarvestDays.ToArray())}, persistent: {Persistent}";
-            return $"{Crop.name}";
-        }
-    }
-
-    public class DayDetails
-    {
-        // list of crops and their details
-        public List<int> cropsNumberToPlant = new List<int>();
-
-        public int totalNumberToPlant
-        {
-            get
-            {
-                if (cropsNumberToPlant == null)
-                    return 0;
-
-                int total = 0;
-                foreach (var numberToPlant in cropsNumberToPlant)
-                    total += numberToPlant;
-
-                return total;
-            }
-        }
-
-        public string ToString(List<Crop> cropList)
-        {
-            string summary = "";
-
-            if (cropsNumberToPlant.Count == 0)
-                return summary;
-            else if (cropsNumberToPlant.Count != cropList.Count)
-            {
-                Console.WriteLine($"[DayDetails] ERROR: input cropList had {cropList.Count} crops, but this DayDetails has {cropsNumberToPlant.Count}.");
-                return summary;
-            }
-
-            for (int i = 0; i < cropList.Count; ++i)
-                summary += $"{cropList[i].name}: {cropsNumberToPlant[i]}, ";
-
-            return summary;
         }
     }
 }

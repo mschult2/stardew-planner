@@ -56,8 +56,6 @@
     <button type="button" class="primary-button" disabled="@(IsBusy)" @onclick="AddCrop">Add Crop</button>
 </div>
 
-
-
 <br />
 
 <div>
@@ -87,8 +85,6 @@
 </div>
 
 <br />
-
-
 
 <div>
     <h4>Planting Schedule</h4>
@@ -409,6 +405,45 @@
 </style>
 
 @code {
+    public class DayDetails
+    {
+        // list of crops and their details
+        public List<int> cropsNumberToPlant = new List<int>();
+
+        public int totalNumberToPlant
+        {
+            get
+            {
+                if (cropsNumberToPlant == null)
+                    return 0;
+
+                int total = 0;
+                foreach (var numberToPlant in cropsNumberToPlant)
+                    total += numberToPlant;
+
+                return total;
+            }
+        }
+
+        public string ToString(List<Crop> cropList)
+        {
+            string summary = "";
+
+            if (cropsNumberToPlant.Count == 0)
+                return summary;
+            else if (cropsNumberToPlant.Count != cropList.Count)
+            {
+                Console.WriteLine($"[DayDetails] ERROR: input cropList had {cropList.Count} crops, but this DayDetails has {cropsNumberToPlant.Count}.");
+                return summary;
+            }
+
+            for (int i = 0; i < cropList.Count; ++i)
+                summary += $"{cropList[i].name}: {cropsNumberToPlant[i]}, ";
+
+            return summary;
+        }
+    }
+
     // Input properties for a new crop
     private string NewCropName = string.Empty;
     private int NewCropTimeToMaturity;
@@ -438,6 +473,9 @@
         // new Crop("Hot Pepper", 5, 3, 40, 40),
         // new Crop("Radish", 6, 1000, 40, 90),
     };
+
+    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(NumDays);
+
     private PlantSchedule Schedule = new(NumDays);
     private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
 
@@ -502,7 +540,6 @@
         Profit = -1;
     }
 
-    private PlantScheduleFactory2 factory2 = new PlantScheduleFactory2(NumDays);
 
     // Generate the planting schedule
     private async void GenerateCalendar()
@@ -519,11 +556,11 @@
             // Calculate schedule with simulation (slow)
             if (AvailableTiles > 0)
             {
-                var wealthAndSchedule = await factory2.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
+                var wealthAndCalendar = await calendarFactory.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
 
                 // Copy to UI elements: Profit, ROI
-                var totalWealth = wealthAndSchedule.Item1;
-                var calendar = wealthAndSchedule.Item2;
+                var totalWealth = wealthAndCalendar.Item1;
+                var calendar = wealthAndCalendar.Item2;
                 Profit = totalWealth - AvailableGold;
                 InvestmentMultiplier = AvailableGold != 0 ? totalWealth / AvailableGold : InvestmentMultiplier;
 
@@ -584,20 +621,20 @@
                 {
                     double curGold = AvailableGold;
 
-                    PlantScheduleFactory2.GameStateCalendar calendar = new PlantScheduleFactory2.GameStateCalendar(NumDays, AvailableTiles, AvailableGold);
+                    GameStateCalendar calendar = new GameStateCalendar(NumDays, AvailableTiles, AvailableGold);
 
-                    calendar.GameStates[0] = new PlantScheduleFactory2.GameState() { Wallet = AvailableGold, };
+                    calendar.GameStates[0] = new GameState() { Wallet = AvailableGold, };
 
                     for (int day = 1; day <= NumDays; ++day)
                     {
                         // Copy game state from previous day
                         var prevGameState = calendar.GameStates[day - 1];
-                        var curGameState = calendar.GameStates[day] = new PlantScheduleFactory2.GameState();
+                        var curGameState = calendar.GameStates[day] = new GameState();
 
                         curGameState.Wallet = calendar.GameStates[day - 1].Wallet;
 
                         foreach (var prevPlantBatch in calendar.GameStates[day - 1].Plants)
-                            curGameState.Plants.Add(new PlantScheduleFactory2.PlantBatch(prevPlantBatch));
+                            curGameState.Plants.Add(new PlantBatch(prevPlantBatch));
 
                         // Buy day
                         if (PlantingDays[day])
@@ -608,11 +645,11 @@
 
                             // Subtract gold and add plants
                             curGameState.Wallet = curGameState.Wallet - unitsToPlant * crop.buyPrice;
-                            curGameState.Plants.Add(new PlantScheduleFactory2.PlantBatch(crop, unitsToPlant, day));
+                            curGameState.Plants.Add(new PlantBatch(crop, unitsToPlant, day));
                         }
                         else
                         {
-                            var plantsToRemove = new List<PlantScheduleFactory2.PlantBatch>();
+                            var plantsToRemove = new List<PlantBatch>();
 
                             foreach (var plantBatch in curGameState.Plants)
                             {
