@@ -131,6 +131,9 @@ namespace StardewCropCalculatorLibrary
         // GameState cache
         private readonly Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>> answerCache = new Dictionary<int, Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>>();
 
+        /// <summary> Percentage of total wealth that must be met in order to bother investing a certain amount of money. </summary>
+        private static readonly double InvestmentThreshold = 0.05;
+
         private int NumDays;
 
         public PlantScheduleFactory2(int numDays)
@@ -143,7 +146,7 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int day, List<Crop> crops, int availableTiles, double availableGold)
         {
-            // If tiles are infinite but gold is finite, it's still sane to calculate profit in gold.
+            // If tiles are infinite but gold is still finite, then we can still calculate finite end wealth.
             if (availableTiles <= 0)
                 availableTiles = 1000000000;
 
@@ -176,18 +179,14 @@ namespace StardewCropCalculatorLibrary
             // Check cache for quick answer
             if (answerCache != null && answerCache.TryGetValue(day, out var goldDict))
             {
-                if (goldDict != null && goldDict.TryGetValue(availableGold, out var tileDict))
+                if (goldDict != null && goldDict.TryGetValue(RoundToSignificantDigits(availableGold, 2), out var tileDict))
                 {
-                    if (tileDict != null && tileDict.TryGetValue(availableTiles, out var wealthSchedulePair))
+                    if (tileDict != null && tileDict.TryGetValue((int)RoundToSignificantDigits((double)availableTiles, 2), out var wealthSchedulePair))
                     {
-                        double cachedWealth = wealthSchedulePair.Item1;
-                        GameStateCalendar cachedCalendar = wealthSchedulePair.Item2;
-
-                        if (cachedCalendar != null)
+                        if (wealthSchedulePair.Item2 != null)
                         {
-                            //Console.WriteLine($"[DEBUG] Accessed cache!!!! Day: {day}, availableGold: {availableGold}, availableTiles: {availableTiles}, ");
-                            calendar.Merge(cachedCalendar, day);
-                            return cachedWealth;
+                            calendar.Merge(wealthSchedulePair.Item2, day);
+                            return wealthSchedulePair.Item1;
                         }
                     }
                 }
@@ -269,6 +268,9 @@ namespace StardewCropCalculatorLibrary
 
                     for (int j = day + 1; j <= numDays; ++j)
                     {
+                        // Base case: raise investment threshold the richer we get, to avoid complicating schedule with trivial investments
+                        goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(localCalendar.GameStates[j]), goldLowerLimit);
+
                         if (localCalendar.GameStates[j].Wallet >= goldLowerLimit && localCalendar.GameStates[j].FreeTiles > 0)
                         {
                             await GetMostProfitableCropRecursive(j, crops, goldLowerLimit, localCalendar);
@@ -288,12 +290,15 @@ namespace StardewCropCalculatorLibrary
             }
 
             // Update cache if the real deal
+            double goldRounded = RoundToSignificantDigits(availableGold, 2);
+            int tilesRounded = (int)RoundToSignificantDigits((int)availableTiles, 2);
+
             if (!answerCache.ContainsKey(day))
                 answerCache[day] = new Dictionary<double, Dictionary<int, Tuple<double, GameStateCalendar>>>();
-            if (!answerCache[day].ContainsKey(availableGold))
-                answerCache[day][availableGold] = new Dictionary<int, Tuple<double, GameStateCalendar>>();
-            if (!answerCache[day][availableGold].ContainsKey(availableTiles) || bestWealth > answerCache[day][availableGold][availableTiles].Item1)
-                answerCache[day][availableGold][availableTiles] = Tuple.Create(bestWealth, bestCalendar);
+            if (!answerCache[day].ContainsKey(goldRounded))
+                answerCache[day][goldRounded] = new Dictionary<int, Tuple<double, GameStateCalendar>>();
+            if (!answerCache[day][goldRounded].ContainsKey(tilesRounded) || bestWealth > answerCache[day][goldRounded][tilesRounded].Item1)
+                answerCache[day][goldRounded][tilesRounded] = Tuple.Create(bestWealth, bestCalendar);
 
             if (bestCalendar != null)
                 calendar.Merge(bestCalendar, day);
@@ -305,6 +310,39 @@ namespace StardewCropCalculatorLibrary
         {
             // TODO: input numDays
             return crop.yieldRate > 0 && crop.yieldRate < 28;
+        }
+
+        /// <summary>
+        /// Round a value to a given number of significant digits.
+        /// Example: If 2 sig digits, 23,343 becomes 23,000. 563 becomes 560.
+        /// </summary>
+        private static double RoundToSignificantDigits(double value, int significantDigits)
+        {
+            if (value == 0)
+                return 0;
+
+            double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(value))) - (significantDigits - 1));
+            return Math.Round(value / scale) * scale;
+        }
+
+        /// <summary>
+        /// The current value of the state of the farm, including gold and crops.
+        /// </summary>
+        private static double MyCurrentValue(GameState currentGameState)
+        {
+            double curValue = currentGameState.Wallet;
+
+            if (currentGameState.Plants != null)
+            {
+                foreach (var plantBatch in currentGameState.Plants)
+                {
+                    // Don't know how far along investment is, so assume original/lowest value to be safe.
+                    if (plantBatch != null && plantBatch.Count > 0)
+                        curValue += plantBatch.Count * plantBatch.CropType.buyPrice;
+                }
+            }
+
+            return curValue;
         }
     }
 }
