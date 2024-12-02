@@ -140,16 +140,15 @@ namespace StardewCropCalculatorLibrary
     public class GameStateCalendarFactory
     {
         // GameState cache
-        private readonly Dictionary<int, Dictionary<double, Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>>> answerCache
-            = new Dictionary<int, Dictionary<double, Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>>>();
+        private readonly Dictionary<string, Tuple<double, GameStateCalendar>> answerCache = new Dictionary<string, Tuple<double, GameStateCalendar>>();
 
         /// <summary> Percentage of total wealth that must be met in order to bother investing a certain amount of money. </summary>
         private static readonly double InvestmentThreshold = 0.05;
 
         /// <summary> Percentage of farm size that must be available in order to bother trying to invest. </summary>
         private static readonly double TileThreshold = 0.05;
-
         private static readonly int SignificantDigits = 2;
+        private static readonly bool UseCache = true;
 
         private int NumDays;
 
@@ -206,27 +205,15 @@ namespace StardewCropCalculatorLibrary
             int numDays = calendar.NumDays;
             int availableTiles = calendar.GameStates[day].FreeTiles;
             double availableGold = calendar.GameStates[day].Wallet;
+            string serializedInputGameState = SerializeGameStateCalendar(calendar, day);
 
             // Check cache for quick answer
-            if (answerCache != null && answerCache.TryGetValue(day, out var goldDict))
+            if (UseCache && answerCache.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
             {
-                if (goldDict != null && goldDict.TryGetValue(RoundToSignificantDigits(availableGold), out var tileDict))
-                {
-                    if (tileDict != null && tileDict.TryGetValue((int)RoundToSignificantDigits(availableTiles), out var gameStateDict))
-                    {
-                        string serializedInputGameState = SerializeGameStateCalendar(day, calendar);
+                ++numCacheHitsStat;
 
-                        if (gameStateDict != null && gameStateDict.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
-                        {
-                            if (wealthSchedulePair.Item2 != null)
-                            {
-                                ++numCacheHitsStat;
-                                calendar.Merge(wealthSchedulePair.Item2, day);
-                                return wealthSchedulePair.Item1;
-                            }
-                        }
-                    }
-                }
+                calendar.Merge(wealthSchedulePair.Item2, day);
+                return wealthSchedulePair.Item1;
             }
 
             foreach (var crop in crops)
@@ -240,8 +227,7 @@ namespace StardewCropCalculatorLibrary
                 int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
 
                 // Short-circuit number of units if too close to end of month for it to make money.
-                if ((day + crop.timeToMaturity > 28)
-                    || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
+                if ((day + crop.timeToMaturity > 28) || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
                     unitsToPlant = 0;
 
                 // Modify day's game state from what it was previously according to the new crop being planted.
@@ -328,35 +314,18 @@ namespace StardewCropCalculatorLibrary
                 endWealth = localCalendar.GameStates[29].Wallet;
 
                 // Save best crop
-                if (endWealth > bestWealth)
+                if (bestCalendar == null || endWealth > bestWealth)
                 {
                     bestWealth = endWealth;
                     bestCalendar = localCalendar;
                 }
             }
 
-            // Update cache if the real deal
-            double goldRounded = RoundToSignificantDigits(availableGold);
-            int tilesRounded = (int)RoundToSignificantDigits(availableTiles);
+            // Update cache. Use key aspects of input game state.
+            if (UseCache && (!answerCache.ContainsKey(serializedInputGameState) || bestWealth > answerCache[serializedInputGameState].Item1))
+                answerCache[serializedInputGameState] = Tuple.Create(bestWealth, bestCalendar);
 
-            if (!answerCache.ContainsKey(day))
-                answerCache[day] = new Dictionary<double, Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>>();
-            if (!answerCache[day].ContainsKey(goldRounded))
-                answerCache[day][goldRounded] = new Dictionary<int, Dictionary<string, Tuple<double, GameStateCalendar>>>();
-            if (!answerCache[day][goldRounded].ContainsKey(tilesRounded))
-            {
-                answerCache[day][goldRounded][tilesRounded] = new Dictionary<string, Tuple<double, GameStateCalendar>>();
-
-                // Cached gamestate is also defined by its future payment plan, BEFORE we modifie it by choosing to plant something today.
-                // In other words, one of the inputs to this method which we must use as a key is the previous gamestate, but just the future days.
-                string serializedInputGameState = SerializeGameStateCalendar(day, calendar);
-
-                if (!answerCache[day][goldRounded][tilesRounded].ContainsKey(serializedInputGameState) || bestWealth > answerCache[day][goldRounded][tilesRounded][serializedInputGameState].Item1)
-                    answerCache[day][goldRounded][tilesRounded][serializedInputGameState] = Tuple.Create(bestWealth, bestCalendar);
-            }
-
-            if (bestCalendar != null)
-                calendar.Merge(bestCalendar, day);
+            calendar.Merge(bestCalendar, day);
 
             return bestWealth;
         }
@@ -375,49 +344,23 @@ namespace StardewCropCalculatorLibrary
             return Math.Round(value / scale) * scale;
         }
 
-        ///// <summary>
-        ///// The current value of the state of the farm, including gold and crops.
-        ///// </summary>
-        //private static double MyCurrentValue(GameState currentGameState)
-        //{
-        //    double curValue = currentGameState.Wallet;
-
-        //    if (currentGameState.Plants != null)
-        //    {
-        //        foreach (var plantBatch in currentGameState.Plants)
-        //        {
-        //            // Don't know how far along investment is, so assume original/lowest value to be safe.
-        //            if (plantBatch != null && plantBatch.Count > 0)
-        //                curValue += plantBatch.Count * plantBatch.CropType.buyPrice;
-        //        }
-        //    }
-
-        //    return curValue;
-        //}
-
         /// <summary>
         /// Serialize game state from the startingDay onward.
         /// </summary>
-        private static string SerializeGameStateCalendar(int startingDay, GameStateCalendar calendar)
+        private static string SerializeGameStateCalendar(GameStateCalendar calendar, int startingDay = 0)
         {
-            StringBuilder serializedInputGameStateSb = new StringBuilder();
+            StringBuilder serializedGameStateSb = new StringBuilder();
+            int finalDay = calendar.NumDays + 1;
 
-            for (int i = startingDay; i <= calendar.NumDays + 1; ++i)
+            for (int day = startingDay; day <= finalDay; ++day)
             {
-                var inputGameStateDay = calendar.GameStates[i];
+                var gameStateDay = calendar.GameStates[day];
 
-                if (inputGameStateDay.DayOfInterest)
-                {
-                    serializedInputGameStateSb.Append(i.ToString());
-                    serializedInputGameStateSb.Append(", ");
-                    serializedInputGameStateSb.Append(RoundToSignificantDigits(inputGameStateDay.Wallet).ToString());
-                    serializedInputGameStateSb.Append(", ");
-                    serializedInputGameStateSb.Append(RoundToSignificantDigits(inputGameStateDay.FreeTiles).ToString());
-                    serializedInputGameStateSb.Append("; ");
-                }
+                if (gameStateDay.DayOfInterest || day == finalDay)
+                    serializedGameStateSb.AppendLine($"{day}_{RoundToSignificantDigits(gameStateDay.Wallet)}_{RoundToSignificantDigits(gameStateDay.FreeTiles)}");
             }
 
-            return serializedInputGameStateSb.ToString();
+            return serializedGameStateSb.ToString();
         }
 
         private static List<int> GetHarvestDays(int plantDay, Crop crop)
@@ -439,17 +382,5 @@ namespace StardewCropCalculatorLibrary
 
             return harvestDays;
         }
-
-        /// <summary>
-        /// Serializes current game state calendar, so it can be used as a unique key.
-        /// </summary>
-        /// <param name="day"></param>
-        /// <param name="calendar"></param>
-        /// <returns></returns>
-        private static string GenerateHashKey(int day, GameStateCalendar calendar)
-        {
-            return $"{day}_{calendar.GameStates[day].Wallet}_{calendar.GameStates[day].FreeTiles}";
-        }
-
     }
 }
