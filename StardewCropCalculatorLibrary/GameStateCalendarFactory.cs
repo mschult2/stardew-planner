@@ -139,6 +139,20 @@ namespace StardewCropCalculatorLibrary
     /// </summary>
     public class GameStateCalendarFactory
     {
+        private class GetMostProfitableCropArgs
+        {
+            public int Day;
+            public double GoldLowerLimit;
+            public GameStateCalendar Calendar;
+
+            public GetMostProfitableCropArgs(int day, double goldLowerLimit, GameStateCalendar calendar)
+            {
+                Day = day;
+                GoldLowerLimit = goldLowerLimit;
+                Calendar = calendar;
+            }
+        }
+
         // GameState cache
         private readonly Dictionary<string, Tuple<double, GameStateCalendar>> answerCache = new Dictionary<string, Tuple<double, GameStateCalendar>>();
 
@@ -154,6 +168,8 @@ namespace StardewCropCalculatorLibrary
 
         private readonly List<Crop> Crops = new List<Crop>();
 
+        private Stack<GetMostProfitableCropArgs> daysToEvaluateStack = new Stack<GetMostProfitableCropArgs>(3000);
+
         private int numOperationsStat = 0;
         private int numCacheHitsStat = 0;
 
@@ -166,7 +182,7 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// Return the optimial schedule.
         /// </summary>
-        public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int day, List<Crop> crops, int availableTiles, double availableGold)
+        public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int availableTiles, double availableGold)
         {
             answerCache.Clear();
             numOperationsStat = 0;
@@ -179,156 +195,177 @@ namespace StardewCropCalculatorLibrary
             var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
             // Find cheapest crop
-            Crop cheapestCrop = crops[0];
-            foreach (var crop in crops)
+            Crop cheapestCrop = Crops[0];
+            foreach (var crop in Crops)
                 cheapestCrop = crop.buyPrice < cheapestCrop.buyPrice ? crop : cheapestCrop;
 
-            var wealth = await GetMostProfitableCropRecursive(day, crops, cheapestCrop.buyPrice, calendar);
+            daysToEvaluateStack.Push(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
 
-            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
-
-            return Tuple.Create(wealth, calendar);
+            return await GetMostProfitableCropIterative();
         }
 
         /// <summary>
-        /// Return the maximum amount of gold you can end the season with, and the schedule accompanies it.
+        /// Return the maximum amount of gold you can end the season with, and the schedule that accompanies it.
         /// </summary>
-        private async Task<double> GetMostProfitableCropRecursive(int day, List<Crop> crops, double goldLowerLimit, GameStateCalendar calendar)
+        private async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCropIterative()
         {
-            await Task.Yield();
+            // TODO: add back async task
+            // TODO: add back caching
 
-            ++numOperationsStat;
+            //await Task.Yield();
+            //++numOperationsStat;
 
+            List<GameStateCalendar> completedCalendars = new List<GameStateCalendar>(300);
+
+            while (daysToEvaluateStack.Count > 0)
+            {
+                bool calendarCompleted = true;
+
+                var args = daysToEvaluateStack.Pop();
+                var day = args.Day;
+                var goldLowerLimit = args.GoldLowerLimit;
+                GameStateCalendar todaysCalendar = args.Calendar;
+
+                int numDays = todaysCalendar.NumDays;
+                int availableTiles = todaysCalendar.GameStates[day].FreeTiles;
+                double availableGold = todaysCalendar.GameStates[day].Wallet;
+                string serializedInputGameState = SerializeGameStateCalendar(todaysCalendar, day);
+
+                //// Check cache for quick answer
+                //if (UseCache && answerCache.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
+                //{
+                //    ++numCacheHitsStat;
+                //    todaysCalendar.Merge(wealthSchedulePair.Item2, day);
+                //    return wealthSchedulePair.Item1;
+                //}
+
+                foreach (var crop in Crops)
+                {
+                    GameStateCalendar thisCropCalendar = new GameStateCalendar(todaysCalendar);
+
+                    // Calculate number of units to plant.
+                    int unitsCanAfford = ((int)(availableGold / crop.buyPrice));
+                    bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
+                    int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
+
+                    // Short-circuit number of units if too close to end of month for it to make money.
+                    if ((day + crop.timeToMaturity > 28) || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
+                        unitsToPlant = 0;
+
+                    if (unitsToPlant > 0)
+                    {
+                        // Update game state calendar based on the current purchase.
+                        UpdateCalendar(thisCropCalendar, unitsToPlant, crop, availableTiles, day);
+
+                        // Update game state calendar based on subsequent purchases.
+                        for (int j = day + 1; j <= numDays; ++j)
+                        {
+                            // Base case: raise investment threshold the richer we get, to avoid complicating schedule with trivial investments
+                            //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(localCalendar.GameStates[j]), goldLowerLimit);
+                            // TODO: experiment with increasing these limits to avoid time-consuming trivial purchases.
+                            // For some reason, raising the tile limit in my last test CAUSED trivial purchases. (Otherwise correct with no perf change) (1000g, inf tiles)
+                            // Raising gold thresh caused a perf decrease. (Otherwise correct, and no interstitial purchases)
+                            if (thisCropCalendar.GameStates[j].Wallet > 0 && (thisCropCalendar.GameStates[j].FreeTiles > 0 || thisCropCalendar.GameStates[j].FreeTiles == -1))
+                            {
+                                calendarCompleted = false;
+                                daysToEvaluateStack.Push(new GetMostProfitableCropArgs(j, 0, thisCropCalendar));
+                                break;
+                            }
+                        }
+                    }
+
+                    if (calendarCompleted)
+                        completedCalendars.Add(thisCropCalendar);
+
+                } // Crops loop
+            } // daysToEvaluate loop
+
+            // Simulation completed. We now have a set of GameStateCalendars which represent every possible schedule. So choose the best.
             double bestWealth = 0;
             GameStateCalendar bestCalendar = null;
 
-            int numDays = calendar.NumDays;
-            int availableTiles = calendar.GameStates[day].FreeTiles;
-            double availableGold = calendar.GameStates[day].Wallet;
-            string serializedInputGameState = SerializeGameStateCalendar(calendar, day);
-
-            // Check cache for quick answer
-            if (UseCache && answerCache.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
+            foreach (var completedCalendar in completedCalendars)
             {
-                ++numCacheHitsStat;
+                double completedWealth = completedCalendar?.GameStates[29].Wallet ?? 0;
 
-                calendar.Merge(wealthSchedulePair.Item2, day);
-                return wealthSchedulePair.Item1;
-            }
-
-            foreach (var crop in crops)
-            {
-                var localCalendar = new GameStateCalendar(calendar);
-                double endWealth = 0;
-
-                // Calculate number of units to plant.
-                int unitsCanAfford = ((int)(availableGold / crop.buyPrice));
-                bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
-                int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
-
-                // Short-circuit number of units if too close to end of month for it to make money.
-                if ((day + crop.timeToMaturity > 28) || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
-                    unitsToPlant = 0;
-
-                // Modify day's game state from what it was previously according to the new crop being planted.
-                // Example: Day 8 and so on may have had 2000 gold and 15 tiles, because of crops we planted on day 1.
-                // So if we plant a new crop in the above code on day 8, we want to decrease the tiles and gold for day 8 and so on.
-                // Until the crop is harvested and perhaps dies at 8 + x, at which point we increase our tiles and gold for day 8 + x and so on.
-                if (unitsToPlant > 0)
+                if (completedWealth > bestWealth)
                 {
-                    // Modify current day state.
-                    double cost = unitsToPlant * crop.buyPrice;
-                    double sale = unitsToPlant * crop.sellPrice;
-
-                    localCalendar.GameStates[day].Wallet = localCalendar.GameStates[day].Wallet - cost;
-                    if (availableTiles != -1)
-                        localCalendar.GameStates[day].FreeTiles = localCalendar.GameStates[day].FreeTiles - unitsToPlant;
-                    localCalendar.GameStates[day].DayOfInterest = true;
-
-                    PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day);
-                    var harvestDays = plantBatch.HarvestDays;
-                    localCalendar.GameStates[day].Plants.Add(plantBatch);
-
-                    double cumulativeSale = 0;
-                    int curUnits = unitsToPlant;
-
-                    for (int j = day; j <= numDays; ++j)
-                    {
-                        if (plantBatch.HarvestDays.Contains(j))
-                        {
-                            // Payday:
-
-                            // Decrease tiles if plant is not dead
-                            if (!plantBatch.Persistent)
-                                curUnits = 0;
-
-                            if (curUnits > 0)
-                            {
-                                localCalendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
-
-                                if (availableTiles != -1)
-                                    localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
-                            }
-
-                            // Modify gold
-                            cumulativeSale += sale;
-
-                            localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
-                            localCalendar.GameStates[j + 1].DayOfInterest = true;
-                        }
-                        else
-                        {
-                            // Not payday:
-
-                            // Decrease tiles if not dead
-                            if (curUnits > 0)
-                            {
-                                if (availableTiles != -1)
-                                    localCalendar.GameStates[j + 1].FreeTiles = localCalendar.GameStates[j + 1].FreeTiles - curUnits;
-
-                                localCalendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
-                            }
-
-                            // Modify gold
-                            localCalendar.GameStates[j + 1].Wallet = localCalendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
-                        }
-                    }
-
-                    for (int j = day + 1; j <= numDays; ++j)
-                    {
-                        // Base case: raise investment threshold the richer we get, to avoid complicating schedule with trivial investments
-
-                        //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(localCalendar.GameStates[j]), goldLowerLimit);
-
-                        // TODO: experiment with increasing these limits to avoid time-consuming trivial purchases.
-                        // For some reason, raising the tile limit in my last test CAUSED trivial purchases. (Otherwise correct with no perf change) (1000g, inf tiles)
-                        // Raising gold thresh caused a perf decrease. (Otherwise correct, and no interstitial purchases)
-                        if (localCalendar.GameStates[j].Wallet > 0 && (localCalendar.GameStates[j].FreeTiles > 0 || localCalendar.GameStates[j].FreeTiles == -1))
-                        {
-                            await GetMostProfitableCropRecursive(j, crops, 0, localCalendar);
-                            break;
-                        }
-                    }
-                }
-
-                endWealth = localCalendar.GameStates[29].Wallet;
-
-                // Save best crop
-                if (bestCalendar == null || endWealth > bestWealth)
-                {
-                    bestWealth = endWealth;
-                    bestCalendar = localCalendar;
+                    bestWealth = completedWealth;
+                    bestCalendar = completedCalendar;
                 }
             }
 
-            // Update cache. Use key aspects of input game state.
-            if (UseCache && (!answerCache.ContainsKey(serializedInputGameState) || bestWealth > answerCache[serializedInputGameState].Item1))
-                answerCache[serializedInputGameState] = Tuple.Create(bestWealth, bestCalendar);
+            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
 
-            calendar.Merge(bestCalendar, day);
+            return Tuple.Create(bestWealth, bestCalendar);
 
-            return bestWealth;
+            //// We have found the optimal crop to plant on this day, and thus the optimal end game state, given the starting game state. Cache it.
+            //if (UseCache && (!answerCache.ContainsKey(serializedInputGameState) || bestCropsWealth > answerCache[serializedInputGameState].Item1))
+            //    answerCache[serializedInputGameState] = Tuple.Create(bestCropsWealth, bestCropsCalendar);
         }
+
+        private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int availableTiles, int day)
+        {
+            // Modify current day state.
+            double cost = unitsToPlant * crop.buyPrice;
+            double sale = unitsToPlant * crop.sellPrice;
+
+            calendar.GameStates[day].Wallet = calendar.GameStates[day].Wallet - cost;
+            if (availableTiles != -1)
+                calendar.GameStates[day].FreeTiles = calendar.GameStates[day].FreeTiles - unitsToPlant;
+            calendar.GameStates[day].DayOfInterest = true;
+
+            PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day);
+            var harvestDays = plantBatch.HarvestDays;
+            calendar.GameStates[day].Plants.Add(plantBatch);
+
+            double cumulativeSale = 0;
+            int curUnits = unitsToPlant;
+
+            // Update game state calendar based on today's crop purchase.
+            for (int j = day; j <= calendar.NumDays; ++j)
+            {
+                if (plantBatch.HarvestDays.Contains(j))
+                {
+                    // Payday:
+
+                    // Decrease tiles if plant is not dead
+                    if (!plantBatch.Persistent)
+                        curUnits = 0;
+
+                    if (curUnits > 0)
+                    {
+                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
+
+                        if (availableTiles != -1)
+                            calendar.GameStates[j + 1].FreeTiles = calendar.GameStates[j + 1].FreeTiles - curUnits;
+                    }
+
+                    // Modify gold
+                    cumulativeSale += sale;
+
+                    calendar.GameStates[j + 1].Wallet = calendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
+                    calendar.GameStates[j + 1].DayOfInterest = true;
+                }
+                else
+                {
+                    // Not payday:
+
+                    // Decrease tiles if not dead
+                    if (curUnits > 0)
+                    {
+                        if (availableTiles != -1)
+                            calendar.GameStates[j + 1].FreeTiles = calendar.GameStates[j + 1].FreeTiles - curUnits;
+
+                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
+                    }
+
+                    // Modify gold
+                    calendar.GameStates[j + 1].Wallet = calendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
+                }
+            }
+        }
+
 
         /// <summary>
         /// Round a value to a given number of significant digits.
