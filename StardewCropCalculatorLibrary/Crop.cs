@@ -15,8 +15,24 @@ namespace StardewCropCalculatorLibrary
         public double buyPrice { get; set; }
         public double sellPrice { get; set; }
 
-        /// <summary> Tile profitability index. How much money a single plant makes you daily. </summary>
-        public int TPI => (int)(((NumHarvests(1, 28) * sellPrice) - buyPrice) / timeToMaturity);
+        /// <summary> Per-tile profitability index. How much money this crop makes occupying one tile over the course of the month. </summary>
+        public int TPI
+        {
+            get
+            {
+
+                if (GameStateCalendarFactory.IsPersistent(this))
+                {
+                    var numHarvests = NumHarvests(1, 28);
+                    return (int)((numHarvests * sellPrice) - buyPrice);
+                }
+                else
+                {
+                    int numHarvests = 28 / (timeToMaturity + 1);
+                    return (int)((numHarvests * sellPrice) - (numHarvests * buyPrice));
+                }
+            }
+        }
 
         public int CurrentProfitIndex(int day)
         {
