@@ -161,12 +161,13 @@ namespace StardewCropCalculatorLibrary
         // GameState cache
         private readonly Dictionary<string, Tuple<double, GameStateCalendar>> answerCache = new Dictionary<string, Tuple<double, GameStateCalendar>>();
 
-        /// <summary> Percentage of total wealth that must be met in order to bother investing a certain amount of money. </summary>
-        private static readonly double InvestmentThreshold = 0.05;
+        // Gold pruning: if gold is quite low we ignore it, to simplify the schedule. Expressed as fraction of starting gold. 0 means we process any amount of gold, and 1 means we ignore an amount equal to the starting gold.
+        private static readonly double GoldInvestmentThreshold = 0;//0.5; //0.4 accounts for hops! Oh wait, this should be limited based on starting tiles.
+        private static readonly double TileInvestmentThresold = 0;//0.5;
 
-        /// <summary> Percentage of farm size that must be available in order to bother trying to invest. </summary>
-        private static readonly double TileThreshold = 0.05;
-        private static readonly int SignificantDigits = 2;
+        // Used to bucket cache results.
+        private static readonly int SignificantDigits = 1;
+
         private static readonly bool UseCache = true;
 
         private int NumDays;
@@ -231,6 +232,8 @@ namespace StardewCropCalculatorLibrary
         private async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCropIterative()
         {
             List<GameStateCalendar> completedCalendars = new List<GameStateCalendar>(300);
+            double bestWealth = 0;
+            GameStateCalendar bestCalendar = null;
 
             // Evaluate all possible schedules.
             // Use a breadth-first approach with the game state tree.
@@ -256,8 +259,6 @@ namespace StardewCropCalculatorLibrary
                 }
 
                 ++numOperationsStat;
-
-                int completedCropSchedulesCount = 0;
 
                 foreach (var crop in Crops)
                 {
@@ -287,8 +288,9 @@ namespace StardewCropCalculatorLibrary
 
                             // startingGold appears to be a good threshold if we have unlimited tiles. But it should be reduced if limited tiles, ie a fraction of how much we can spend.
 
-                            if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles > 10 || thisCropCalendar.GameStates[j].FreeTiles == -1))
-                            //if (thisCropCalendar.GameStates[j].Wallet >= startingGold && (thisCropCalendar.GameStates[j].FreeTiles > 10 || thisCropCalendar.GameStates[j].FreeTiles == -1))
+                            //if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
+                            if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && thisCropCalendar.GameStates[j].Wallet >= startingGold * GoldInvestmentThreshold
+                                && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
                             {
                                 thisCropScheduleCompleted = false;
                                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, 0, thisCropCalendar));
@@ -299,38 +301,25 @@ namespace StardewCropCalculatorLibrary
                     else
                         thisCropScheduleCompleted = true;
 
-                    // If no further action can be taken for the rest of the month, then this crop is a dead end in the game state tree.
-                    if (thisCropScheduleCompleted)
-                        ++completedCropSchedulesCount;
-
                     // If no further action can be taken for all crops, then a schedule has been completed!
-                    if (completedCropSchedulesCount >= Crops.Count)
+                    if (thisCropScheduleCompleted)
                     {
                         completedCalendars.Add(thisCropCalendar);
 
                         double thisCropWealth = thisCropCalendar?.GameStates[29].Wallet ?? 0;
 
-                        if (UseCache && (!answerCache.ContainsKey(serializedInputGameState) || thisCropWealth > answerCache[serializedInputGameState].Item1))
+                        if (thisCropWealth > bestWealth)
+                        {
+                            bestWealth = thisCropWealth;
+                            bestCalendar = thisCropCalendar;
+                        }
+
+                        if (!answerCache.ContainsKey(serializedInputGameState))
                             answerCache[serializedInputGameState] = Tuple.Create(thisCropWealth, thisCropCalendar);
                     }
 
                 } // Crops loop
             } // daysToEvaluate loop
-
-            // Simulation completed. We now have a set of GameStateCalendars which represent every possible schedule. So choose the best one.
-            double bestWealth = 0;
-            GameStateCalendar bestCalendar = null;
-
-            foreach (var completedCalendar in completedCalendars)
-            {
-                double completedWealth = completedCalendar?.GameStates[29].Wallet ?? 0;
-
-                if (completedWealth > bestWealth)
-                {
-                    bestWealth = completedWealth;
-                    bestCalendar = completedCalendar;
-                }
-            }
 
             return Tuple.Create(bestWealth, bestCalendar);
 
