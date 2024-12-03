@@ -230,18 +230,13 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         private async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCropIterative()
         {
-            // TODO: add back async task
-            // TODO: add back cache
-
-            //await Task.Yield();
-
             List<GameStateCalendar> completedCalendars = new List<GameStateCalendar>(300);
 
             // Evaluate all possible schedules.
             // Use a breadth-first approach with the game state tree.
             while (daysToEvaluate.Count > 0)
             {
-                ++numOperationsStat;
+                await Task.Yield();
 
                 var args = daysToEvaluate.Dequeue();
                 var day = args.Day;
@@ -254,12 +249,13 @@ namespace StardewCropCalculatorLibrary
                 string serializedInputGameState = SerializeGameStateCalendar(todaysCalendar, day);
 
                 // Check cache for quick answer
-                //if (UseCache && answerCache.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
-                //{
-                //    ++numCacheHitsStat;
-                //    todaysCalendar.Merge(wealthSchedulePair.Item2, day);
-                //    return wealthSchedulePair;
-                //}
+                if (UseCache && answerCache.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
+                {
+                    ++numCacheHitsStat;
+                    continue;
+                }
+
+                ++numOperationsStat;
 
                 int completedCropSchedulesCount = 0;
 
@@ -286,18 +282,18 @@ namespace StardewCropCalculatorLibrary
                         // Queue up updating game state based on subsequent purchases.
                         for (int j = day + 1; j <= numDays; ++j)
                         {
-                            // TODO: experiment with increasing these limits to avoid time-consuming trivial purchases.
-                            // For some reason, raising the gold limit increases number of operations from 2000 to 6000!
-                            // Raising gold thresh caused a perf decrease. (Otherwise correct, and no interstitial purchases)
+                            // Be careful with increasing the threshold. In a past implementation, it counter-intuitively increased the state space from 2000 to 6000. In another implementation, it made the results incorrect.
                             //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(thisCropCalendar.GameStates[j]), goldLowerLimit);
 
+                            // startingGold appears to be a good threshold if we have unlimited tiles. But it should be reduced if limited tiles, ie a fraction of how much we can spend.
+
                             if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles > 10 || thisCropCalendar.GameStates[j].FreeTiles == -1))
+                            //if (thisCropCalendar.GameStates[j].Wallet >= startingGold && (thisCropCalendar.GameStates[j].FreeTiles > 10 || thisCropCalendar.GameStates[j].FreeTiles == -1))
                             {
                                 thisCropScheduleCompleted = false;
                                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, 0, thisCropCalendar));
                                 break;
                             }
-
                         }
                     }
                     else

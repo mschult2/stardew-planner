@@ -444,7 +444,7 @@
         }
     }
 
-    private static readonly List<Crop> DefaultCrops = new ()
+    private static readonly List<Crop> DefaultCrops = new()
     {
         new Crop("Blueberry", 13, 4, 80, 150),
         new Crop("Hot Pepper", 5, 3, 40, 40),
@@ -467,6 +467,12 @@
         /* Use this with 0 tiles. Answer is all wheat, ofc. Profit 483k. IM takes 8 seconds. */
         // new Crop("Hot Pepper", 5, 3, 40, 40),
         // new Crop("Wheat", 4, 1000, 10, 25),
+
+        /* COPY THIS ONE: Use this with 0 tiles. Answer is 5 peps, then 2 rad. Profit 221k. IM takes  seconds. */
+        // new Crop("Spangle", 8, 1000, 50, 90),
+        // new Crop("Tomato", 11, 4, 50, 60),
+        // new Crop("Starfruit", 13, 1000, 400, 750),
+        // new Crop("Hops", 11, 1, 60, 25),
     };
 
     // Input properties for a new crop
@@ -649,21 +655,9 @@
                         foreach (var prevPlantBatch in calendar.GameStates[day - 1].Plants)
                             curGameState.Plants.Add(new PlantBatch(prevPlantBatch));
 
-                        // Buy day
-                        if (PlantingDays[day])
-                        {
-                            var crop = Schedule.GetCrop(day);
-                            var unitsToPlant = (int)(curGameState.Wallet / Schedule.GetCrop(day).buyPrice);
-                            ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() { unitsToPlant } };
-
-                            // Subtract gold and add plants
-                            curGameState.Wallet = curGameState.Wallet - unitsToPlant * crop.buyPrice;
-                            curGameState.Plants.Add(new PlantBatch(crop, unitsToPlant, day));
-                        }
-                        else
+                        // Sell day
                         {
                             var plantsToRemove = new List<PlantBatch>();
-
                             foreach (var plantBatch in curGameState.Plants)
                             {
                                 // Sell day
@@ -681,6 +675,18 @@
 
                             foreach (var plantToRemove in plantsToRemove)
                                 curGameState.Plants.Remove(plantToRemove);
+                        }
+
+                        // Buy day
+                        if (PlantingDays[day])
+                        {
+                            var crop = Schedule.GetCrop(day);
+                            var unitsToPlant = (int)(curGameState.Wallet / Schedule.GetCrop(day).buyPrice);
+                            ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() { unitsToPlant } };
+
+                            // Subtract gold and add plants
+                            curGameState.Wallet = curGameState.Wallet - unitsToPlant * crop.buyPrice;
+                            curGameState.Plants.Add(new PlantBatch(crop, unitsToPlant, day));
                         }
                     }
                 }
