@@ -131,6 +131,11 @@ namespace StardewCropCalculatorLibrary
             // TODO: input numDays
             return crop.yieldRate > 0 && crop.yieldRate < 28;
         }
+
+        public override string ToString()
+        {
+            return $"{Count} {CropType.name}";
+        }
     }
 
     /// <summary>
@@ -173,10 +178,23 @@ namespace StardewCropCalculatorLibrary
         private int numOperationsStat = 0;
         private int numCacheHitsStat = 0;
 
+        private int startingTiles = 0;
+        private double startingGold = 0;
+
+        private Crop cheapestCrop = null;
+
         public GameStateCalendarFactory(int numDays, List<Crop> crops)
         {
             NumDays = numDays;
             Crops = crops;
+
+            // Find cheapest crop
+            if (Crops != null && Crops.Count > 0)
+            {
+                cheapestCrop = Crops[0];
+                foreach (var crop in Crops)
+                    cheapestCrop = crop.buyPrice < cheapestCrop.buyPrice ? crop : cheapestCrop;
+            }
         }
 
         /// <summary>
@@ -185,6 +203,7 @@ namespace StardewCropCalculatorLibrary
         public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int availableTiles, double availableGold)
         {
             answerCache.Clear();
+            daysToEvaluate.Clear();
             numOperationsStat = 0;
             numCacheHitsStat = 0;
 
@@ -194,10 +213,8 @@ namespace StardewCropCalculatorLibrary
 
             var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
-            // Find cheapest crop
-            Crop cheapestCrop = Crops[0];
-            foreach (var crop in Crops)
-                cheapestCrop = crop.buyPrice < cheapestCrop.buyPrice ? crop : cheapestCrop;
+            startingGold = availableGold;
+            startingTiles = availableTiles;
 
             daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
 
@@ -214,10 +231,9 @@ namespace StardewCropCalculatorLibrary
         private async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCropIterative()
         {
             // TODO: add back async task
-            // TODO: add back caching
+            // TODO: add back cache
 
             //await Task.Yield();
-            //++numOperationsStat;
 
             List<GameStateCalendar> completedCalendars = new List<GameStateCalendar>(300);
 
@@ -225,6 +241,8 @@ namespace StardewCropCalculatorLibrary
             // Use a breadth-first approach with the game state tree.
             while (daysToEvaluate.Count > 0)
             {
+                ++numOperationsStat;
+
                 var args = daysToEvaluate.Dequeue();
                 var day = args.Day;
                 var goldLowerLimit = args.GoldLowerLimit;
@@ -235,7 +253,7 @@ namespace StardewCropCalculatorLibrary
                 double availableGold = todaysCalendar.GameStates[day].Wallet;
                 string serializedInputGameState = SerializeGameStateCalendar(todaysCalendar, day);
 
-                //// Check cache for quick answer
+                // Check cache for quick answer
                 //if (UseCache && answerCache.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
                 //{
                 //    ++numCacheHitsStat;
@@ -243,9 +261,11 @@ namespace StardewCropCalculatorLibrary
                 //    return wealthSchedulePair;
                 //}
 
+                int completedCropSchedulesCount = 0;
+
                 foreach (var crop in Crops)
                 {
-                    bool calendarCompleted = true;
+                    bool thisCropScheduleCompleted = true;
 
                     GameStateCalendar thisCropCalendar = new GameStateCalendar(todaysCalendar);
 
@@ -255,7 +275,7 @@ namespace StardewCropCalculatorLibrary
                     int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
 
                     // Short-circuit number of units if too close to end of month for it to make money.
-                    if ((day + crop.timeToMaturity > 28) || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
+                    if ((day + crop.timeToMaturity > numDays) || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
                         unitsToPlant = 0;
 
                     if (unitsToPlant > 0)
@@ -266,22 +286,37 @@ namespace StardewCropCalculatorLibrary
                         // Queue up updating game state based on subsequent purchases.
                         for (int j = day + 1; j <= numDays; ++j)
                         {
-                            // Base case: raise investment threshold the richer we get, to avoid complicating schedule with trivial investments
-                            //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(localCalendar.GameStates[j]), goldLowerLimit);
                             // TODO: experiment with increasing these limits to avoid time-consuming trivial purchases.
-                            // For some reason, raising the tile limit in my last test CAUSED trivial purchases. (Otherwise correct with no perf change) (1000g, inf tiles)
+                            // For some reason, raising the gold limit increases number of operations from 2000 to 6000!
                             // Raising gold thresh caused a perf decrease. (Otherwise correct, and no interstitial purchases)
-                            if (thisCropCalendar.GameStates[j].Wallet > 0 && (thisCropCalendar.GameStates[j].FreeTiles > 0 || thisCropCalendar.GameStates[j].FreeTiles == -1))
+                            //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(thisCropCalendar.GameStates[j]), goldLowerLimit);
+
+                            if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles > 10 || thisCropCalendar.GameStates[j].FreeTiles == -1))
                             {
-                                calendarCompleted = false;
+                                thisCropScheduleCompleted = false;
                                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, 0, thisCropCalendar));
                                 break;
                             }
+
                         }
                     }
+                    else
+                        thisCropScheduleCompleted = true;
 
-                    if (calendarCompleted)
+                    // If no further action can be taken for the rest of the month, then this crop is a dead end in the game state tree.
+                    if (thisCropScheduleCompleted)
+                        ++completedCropSchedulesCount;
+
+                    // If no further action can be taken for all crops, then a schedule has been completed!
+                    if (completedCropSchedulesCount >= Crops.Count)
+                    {
                         completedCalendars.Add(thisCropCalendar);
+
+                        double thisCropWealth = thisCropCalendar?.GameStates[29].Wallet ?? 0;
+
+                        if (UseCache && (!answerCache.ContainsKey(serializedInputGameState) || thisCropWealth > answerCache[serializedInputGameState].Item1))
+                            answerCache[serializedInputGameState] = Tuple.Create(thisCropWealth, thisCropCalendar);
+                    }
 
                 } // Crops loop
             } // daysToEvaluate loop
@@ -303,12 +338,13 @@ namespace StardewCropCalculatorLibrary
 
             return Tuple.Create(bestWealth, bestCalendar);
 
-            //if (UseCache && (!answerCache.ContainsKey(serializedInputGameState) || thisCropWealth > answerCache[serializedInputGameState].Item1))
-            //    answerCache[serializedInputGameState] = Tuple.Create(thisCropWealth, thisCropCalendar);
         }
 
         private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int availableTiles, int day)
         {
+            if (unitsToPlant <= 0)
+                return;
+
             // Modify current day state.
             double cost = unitsToPlant * crop.buyPrice;
             double sale = unitsToPlant * crop.sellPrice;
@@ -369,7 +405,6 @@ namespace StardewCropCalculatorLibrary
             }
         }
 
-
         /// <summary>
         /// Round a value to a given number of significant digits.
         /// Example: If 2 sig digits, 23,343 becomes 23,000. 563 becomes 560.
@@ -422,5 +457,40 @@ namespace StardewCropCalculatorLibrary
 
             return harvestDays;
         }
+
+        private bool CanPlantInFuture(int currentDay, GameStateCalendar calendar)
+        {
+            int numDays = calendar.NumDays;
+
+            for (int day = currentDay + 1; day <= numDays; ++day)
+            {
+                double availableGold = calendar.GameStates[day].Wallet;
+                int availableTiles = calendar.GameStates[day].FreeTiles;
+
+                if (availableGold > 0 && (availableTiles > 0 || availableTiles == -1))
+                {
+                    // Check if any crop can be planted on this day
+                    foreach (var crop in Crops)
+                    {
+                        if (day + crop.timeToMaturity <= numDays)
+                        {
+                            int unitsCanAfford = (int)(availableGold / crop.buyPrice);
+
+                            if (unitsCanAfford > 0)
+                                return true; // Planting is possible in the future
+                        }
+                    }
+                }
+            }
+
+            return false; // No planting actions possible in future days
+        }
+
+        public static bool IsPersistent(Crop crop)
+        {
+            // TODO: input numDays
+            return crop.yieldRate > 0 && crop.yieldRate < 28;
+        }
+
     }
 }

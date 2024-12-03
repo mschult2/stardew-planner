@@ -69,7 +69,7 @@
                     <div class="crop-content">
                         <span>
                             @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g
-                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"))
+                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"), @crop.TPI)
                         </span>
                         <button type="button" class="delete-btn" disabled="@(IsBusy)" @onclick="(() => DeleteCrop(crop))">Delete</button>
                     </div>
@@ -457,11 +457,16 @@
         new Crop("Starfruit", 13, 1000, 400, 750),
         new Crop("Wheat", 4, 1000, 10, 25),
 
+        /* Use this with 0 tiles. Answer is a few peps, melon, then a last pep. Profit 167k. IM takes 4m08s. */
         // new Crop("Blueberry", 13, 4, 80, 150),
         // new Crop("Hot Pepper", 5, 3, 40, 40),
         // new Crop("Melon", 12, 1000, 80, 250),
         // new Crop("Hops", 11, 1, 60, 25),
         // new Crop("Tomato", 11, 4, 50, 60),
+
+        /* Use this with 0 tiles. Answer is all wheat, ofc. Profit 483k. IM takes 8 seconds. */
+        // new Crop("Hot Pepper", 5, 3, 40, 40),
+        // new Crop("Wheat", 4, 1000, 10, 25),
     };
 
     // Input properties for a new crop
@@ -488,7 +493,6 @@
     private bool[] HarvestDays = new bool[NumDays + 1];
     private double InvestmentMultiplier = -1;
     private double Profit = -1;
-    private bool TileLimited;
     private bool IsBusy;
 
     protected override void OnInitialized()
@@ -565,7 +569,7 @@
             // Calculate schedule with simulation (slow)
             if (AvailableTiles > 0)
             {
-                var wealthAndCalendar = await calendarFactory.GetMostProfitableCrop(1, Crops, AvailableTiles, AvailableGold);
+                var wealthAndCalendar = await calendarFactory.GetMostProfitableCrop(AvailableTiles, AvailableGold);
 
                 // Copy to UI elements: Profit, ROI
                 var totalWealth = wealthAndCalendar.Item1;
