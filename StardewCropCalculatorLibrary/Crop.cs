@@ -15,12 +15,16 @@ namespace StardewCropCalculatorLibrary
         public double buyPrice { get; set; }
         public double sellPrice { get; set; }
 
-        /// <summary> Per-tile profitability index. How much money this crop makes occupying one tile over the course of the month. </summary>
+        /// <summary>
+        /// Per-tile profitability index. How much money this crop makes occupying one tile over the course of the month.
+        /// Note that this metric is misleading, because it's only useful if all tiles are filled.
+        /// But if you switch to another crop with a better TPI, that crop might not fill all the tiles at the same rate.
+        /// So it's only useful in situations where available tiles are so low, ANY crop can fill them up almost immediately.
+        /// </summary>
         public int TPI
         {
             get
             {
-
                 if (GameStateCalendarFactory.IsPersistent(this))
                 {
                     var numHarvests = NumHarvests(1, 28);
@@ -36,12 +40,16 @@ namespace StardewCropCalculatorLibrary
 
         public int CurrentProfitIndex(int day)
         {
-            int numHarvestsLeft = NumHarvests(day, 28);
-
             if (GameStateCalendarFactory.IsPersistent(this))
-                return (int)((numHarvestsLeft * sellPrice) - buyPrice);
+            {
+                var numHarvests = NumHarvests(day, 28);
+                return (int)((numHarvests * sellPrice) - buyPrice);
+            }
             else
-                return (int)((NumHarvests(day, 28) * sellPrice) - numHarvestsLeft * buyPrice);
+            {
+                int numHarvests = (29 - day) / (timeToMaturity + 1);
+                return (int)((numHarvests * sellPrice) - (numHarvests * buyPrice));
+            }
         }
 
         /// <summary>

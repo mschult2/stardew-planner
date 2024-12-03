@@ -162,8 +162,8 @@ namespace StardewCropCalculatorLibrary
         private readonly Dictionary<string, Tuple<double, GameStateCalendar>> answerCache = new Dictionary<string, Tuple<double, GameStateCalendar>>();
 
         // Gold pruning: if gold is quite low we ignore it, to simplify the schedule. Expressed as fraction of starting gold. 0 means we process any amount of gold, and 1 means we ignore an amount equal to the starting gold.
-        private static readonly double GoldInvestmentThreshold = 0;//0.5; //0.4 accounts for hops! Oh wait, this should be limited based on starting tiles.
-        private static readonly double TileInvestmentThresold = 0;//0.5;
+        private static readonly double GoldInvestmentThreshold = 0.5;
+        private static readonly double TileInvestmentThresold = 0.07;
 
         // Used to bucket cache results.
         private static readonly int SignificantDigits = 1;
@@ -290,7 +290,7 @@ namespace StardewCropCalculatorLibrary
 
                             //if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
                             if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && thisCropCalendar.GameStates[j].Wallet >= startingGold * GoldInvestmentThreshold
-                                && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
+                                && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0) && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > startingTiles * TileInvestmentThresold))
                             {
                                 thisCropScheduleCompleted = false;
                                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, 0, thisCropCalendar));
@@ -322,7 +322,6 @@ namespace StardewCropCalculatorLibrary
             } // daysToEvaluate loop
 
             return Tuple.Create(bestWealth, bestCalendar);
-
         }
 
         private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int availableTiles, int day)

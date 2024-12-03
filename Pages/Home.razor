@@ -69,7 +69,7 @@
                     <div class="crop-content">
                         <span>
                             @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g
-                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"), @crop.TPI)
+                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"))
                         </span>
                         <button type="button" class="delete-btn" disabled="@(IsBusy)" @onclick="(() => DeleteCrop(crop))">Delete</button>
                     </div>
@@ -444,36 +444,91 @@
         }
     }
 
+    /* Starting crops are Summer crops. */
     private static readonly List<Crop> DefaultCrops = new()
     {
-        new Crop("Blueberry", 13, 4, 80, 150),
-        new Crop("Hot Pepper", 5, 3, 40, 40),
-        new Crop("Melon", 12, 1000, 80, 250),
-        new Crop("Hops", 11, 1, 60, 25),
-        new Crop("Tomato", 11, 4, 50, 60),
-        new Crop("Radish", 6, 1000, 40, 90),
-        new Crop("Poppy", 7, 1000, 100, 140),
-        new Crop("Spangle", 8, 1000, 50, 90),
-        new Crop("Starfruit", 13, 1000, 400, 750),
-        new Crop("Wheat", 4, 1000, 10, 25),
-
-        /* Use this with 0 tiles. Answer is a few peps, melon, then a last pep. Profit 167k. IM takes 4m08s. */
-        // new Crop("Blueberry", 13, 4, 80, 150),
-        // new Crop("Hot Pepper", 5, 3, 40, 40),
-        // new Crop("Melon", 12, 1000, 80, 250),
-        // new Crop("Hops", 11, 1, 60, 25),
-        // new Crop("Tomato", 11, 4, 50, 60),
-
-        /* Use this with 0 tiles. Answer is all wheat, ofc. Profit 483k. IM takes 8 seconds. */
-        // new Crop("Hot Pepper", 5, 3, 40, 40),
-        // new Crop("Wheat", 4, 1000, 10, 25),
-
-        /* COPY THIS ONE: Use this with 0 tiles. Answer is 5 peps, then 2 rad. Profit 221k. IM takes  seconds. */
-        // new Crop("Spangle", 8, 1000, 50, 90),
-        // new Crop("Tomato", 11, 4, 50, 60),
-        // new Crop("Starfruit", 13, 1000, 400, 750),
-        // new Crop("Hops", 11, 1, 60, 25),
+        // Solo test: 2000g, 100t. Optimal profit .
+        new Crop("Blueberry", 13, 4, 80, 150), // solo 16k
+        new Crop("Hot Pepper", 5, 3, 40, 40), // solo 24k
+        new Crop("Melon", 12, 1000, 80, 250), // solo 17.5k
+        new Crop("Hops", 11, 1, 60, 25), // solo 13k
+        new Crop("Tomato", 11, 4, 50, 60), // solo 13.5k
+        new Crop("Radish", 6, 1000, 40, 90), // solo 17.5k
+        new Crop("Poppy", 7, 1000, 100, 140), // solo 3.5k
+        new Crop("Spangle", 8, 1000, 50, 90), // solo 8.5k
+        new Crop("Starfruit", 13, 1000, 400, 750), // solo 5k
+        new Crop("Wheat", 4, 1000, 10, 25), // solo 7.5k
     };
+
+    private double AvailableGold = 5000;
+    private int AvailableTiles = 100;
+
+    /* Test 1: Use this with 0 tiles. Answer is a few peps, melon, then a last pep. Profit 167k.
+     * SIG DIGIT: 2 sig dig takes 3m19s, 1 sig take takes only 35s!
+     * Gold pruning 0.2-0.4 thresh lowers it to 28s. Thresh 0.5 lowers it to 17s. And still accurate!
+     */
+    // private static readonly List<Crop> DefaultCrops = new()
+    // {
+    //     new Crop("Blueberry", 13, 4, 80, 150),
+    //     new Crop("Hot Pepper", 5, 3, 40, 40),
+    //     new Crop("Melon", 12, 1000, 80, 250),
+    //     new Crop("Hops", 11, 1, 60, 25),
+    //     new Crop("Tomato", 11, 4, 50, 60),
+    // };
+    // private int AvailableTiles = 0;
+
+    /* Test 2: Use this with 0 tiles. Answer is all wheat, ofc. Profit 483k. IM takes 8 seconds. */
+    // private static readonly List<Crop> DefaultCrops = new()
+    // {
+    //     new Crop("Hot Pepper", 5, 3, 40, 40),
+    //     new Crop("Wheat", 4, 1000, 10, 25),
+    // };
+    // private int AvailableTiles = 0;
+
+    /* Test 3: Use this with 0 tiles. Answer is: d1 83 hop, d13 41 tomato, d14 5 star, d15 5 star, d16-d20 41 spangle. Profit 45k.
+     * SIG DIGIT WORKS: Takes 40 seconds with sig dig 2, 6 seconds with sig dig 1!
+     * Results changed, but trivially. The two days of 5 starfruits were replaced with more 41 spangles.
+     */
+    // private static readonly List<Crop> DefaultCrops = new()
+    // {
+    //     new Crop("Spangle", 8, 1000, 50, 90),
+    //     new Crop("Tomato", 11, 4, 50, 60),
+    //     new Crop("Starfruit", 13, 1000, 400, 750),
+    //     new Crop("Hops", 11, 1, 60, 25),
+    // };
+    // private int AvailableTiles = 0;
+
+    /* Test 4: Use this with 5 tiles. Answer is D1 Bluberry, ie crop with highest TPI. Profit 26k. IM takes 1 second.
+     */
+    // private static readonly List<Crop> DefaultCrops = new()
+    // {
+    //     new Crop("Hot Pepper", 5, 3, 40, 40),
+    //     new Crop("Melon", 12, 1000, 80, 250),
+    //     new Crop("Hops", 11, 1, 60, 25),
+    //     new Crop("Tomato", 11, 4, 50, 60),
+    //     new Crop("Blueberry", 13, 4, 80, 150),
+    // };
+    // private int AvailableTiles = 5;
+
+    /* Test 5: 3000g, 100 tiles.
+     * ERROR: After 7min: Garbage collector could not allocate 65536u bytes of memory for major heap section, (browser only using 2GB). BUT goes away with gold thresh.
+     * IM returns: 26k profit. D1 37 pep, D7 18 blue, D10 19 blue, D13 18 melon, d16 8 melon.
+     * This answer *may* be correct. At least, it is more profitable than planting only blueberries, since they only get up to using 50 tiles.
+     * Browser is only taking 2 GB tho, which isn't too much.
+     * BUt only takes 25s
+     */
+    // private static readonly List<Crop> DefaultCrops = new()
+    // {
+    //     new Crop("Wheat", 4, 1000, 10, 25),
+    //     new Crop("Starfruit", 13, 1000, 400, 750),
+    //     new Crop("Blueberry", 13, 4, 80, 150),
+    //     new Crop("Hot Pepper", 5, 3, 40, 40),
+    //     new Crop("Melon", 12, 1000, 80, 250),
+    //     new Crop("Hops", 11, 1, 60, 25),
+    //     new Crop("Tomato", 11, 4, 50, 60),
+    // };
+    // private int AvailableTiles = 100;
+    // private double AvailableGold = 1500;
 
     // Input properties for a new crop
     private string NewCropName = string.Empty;
@@ -481,10 +536,6 @@
     private int NewCropYieldRate;
     private double NewCropBuyPrice;
     private double NewCropSellPrice;
-
-    // Settings for gold and tiles
-    private double AvailableGold = 5000;
-    private int AvailableTiles = 100;
 
     // Default crop list
     private List<Crop> Crops = new List<Crop>(DefaultCrops);
@@ -503,10 +554,6 @@
 
     protected override void OnInitialized()
     {
-        // Since it takes a while to populate, don't automatically generate the schedule when the page loads
-        // if (Crops != null && Crops.Count > 0)
-        //     GenerateCalendar();
-
         ClearSchedule();
     }
 
@@ -603,6 +650,8 @@
                                     PlantingDays[day] = true;
 
                                     Schedule.AddCrop(day, batch.CropType);
+                                    Console.WriteLine($"    -> Day {day}: {batch.Count} {batch.CropType.name} PPI: {batch.CropType.CurrentProfitIndex(day)}");
+
 
                                     if (ScheduleDetails[day] == null)
                                         ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
