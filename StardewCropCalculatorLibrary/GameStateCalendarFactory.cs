@@ -32,6 +32,9 @@ namespace StardewCropCalculatorLibrary
             }
         }
 
+        /// <summary>
+        /// Deep copy is default. Can optionally choose shallow copy.
+        /// </summary>
         public GameStateCalendar(GameStateCalendar otherCalendar)
         {
             NumDays = otherCalendar.NumDays;
@@ -39,12 +42,37 @@ namespace StardewCropCalculatorLibrary
             for (int i = 1; i <= NumDays + 1; ++i)
                 GameStates.Add(i, new GameState());
 
-            Merge(otherCalendar, 1);
+            Merge(otherCalendar);
         }
 
-        private void Merge(GameStateCalendar otherCalendar, int otherStartingDay)
+        public GameStateCalendar(GameStateCalendar otherCalendar, int startingDay, int endingDay)
         {
-            for (int i = otherStartingDay; i <= NumDays + 1; ++i)
+            NumDays = otherCalendar.NumDays;
+
+            // Deep copy of indicated range
+            for (int i = startingDay; i <= endingDay; ++i)
+                GameStates.Add(i, new GameState());
+
+            Merge(otherCalendar, startingDay, endingDay);
+
+            // Shallow copy of other range
+            for (int i = 1; i <= NumDays + 1; ++i)
+            {
+                if (i < startingDay || i > endingDay)
+                    GameStates.Add(i, otherCalendar.GameStates[i]);
+            }
+        }
+
+        /// <summary>
+        /// DeepCopy otherCalendar onto this calendar, within a certain range.
+        /// Values outside the indicated range are left untouched.
+        /// </summary>
+        /// <param name="otherCalendar">The calendar to copy</param>
+        /// <param name="startingDay">The day to copy from.</param>
+        /// <param name="endingDay">The day to end copying on.</param>
+        public void Merge(GameStateCalendar otherCalendar, int startingDay = 1, int endingDay = 29)
+        {
+            for (int i = startingDay; i <= endingDay; ++i)
             {
                 GameStates[i].Wallet = otherCalendar.GameStates[i].Wallet;
                 GameStates[i].FreeTiles = otherCalendar.GameStates[i].FreeTiles;
@@ -144,23 +172,6 @@ namespace StardewCropCalculatorLibrary
     /// </summary>
     public class GameStateCalendarFactory
     {
-        //public class GameStateTree
-        //{
-        //    public GameState Value { get; set; }
-        //    public List<GameStateTree> Children { get; set; }
-
-        //    public GameStateTree(GameState value)
-        //    {
-        //        Value = value;
-        //        Children = new List<GameStateTree>();
-        //    }
-
-        //    public void AddChild(GameStateTree child)
-        //    {
-        //        Children.Add(child);
-        //    }
-        //}
-
         private class GetMostProfitableCropArgs
         {
             public int Day;
@@ -201,7 +212,7 @@ namespace StardewCropCalculatorLibrary
 
         private Crop cheapestCrop = null;
 
-        private double memoryThreshold = 1.35;
+        private double memoryThreshold = 1.38;
 
         public GameStateCalendarFactory(int numDays, List<Crop> crops)
         {
@@ -302,7 +313,8 @@ namespace StardewCropCalculatorLibrary
                 {
                     bool thisCropScheduleCompleted = true;
 
-                    GameStateCalendar thisCropCalendar = new GameStateCalendar(todaysCalendar);
+                    // Tree data structure: make shallow read-only copy of previous days, and deep copy of current and future days since we mean to modify them.
+                    GameStateCalendar thisCropCalendar = new GameStateCalendar(todaysCalendar, startingDay: day, endingDay: numDays + 1);
 
                     // Calculate number of units to plant.
                     int unitsCanAfford = ((int)(availableGold / crop.buyPrice));
