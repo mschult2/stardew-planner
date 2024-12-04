@@ -12,7 +12,7 @@ namespace StardewCropCalculatorLibrary
     /// <summary> The state of our farm on every day. </summary>
     public class GameStateCalendar
     {
-        public int NumDays;
+        public readonly int NumDays;
 
         /// <summary> The state of our farm on a particular day. Ie, how many plants, free tiles, and gold we have. </summary>
         public readonly SortedDictionary<int, GameState> GameStates = new SortedDictionary<int, GameState>();
@@ -42,7 +42,7 @@ namespace StardewCropCalculatorLibrary
             Merge(otherCalendar, 1);
         }
 
-        public void Merge(GameStateCalendar otherCalendar, int otherStartingDay)
+        private void Merge(GameStateCalendar otherCalendar, int otherStartingDay)
         {
             for (int i = otherStartingDay; i <= NumDays + 1; ++i)
             {
@@ -144,6 +144,23 @@ namespace StardewCropCalculatorLibrary
     /// </summary>
     public class GameStateCalendarFactory
     {
+        //public class GameStateTree
+        //{
+        //    public GameState Value { get; set; }
+        //    public List<GameStateTree> Children { get; set; }
+
+        //    public GameStateTree(GameState value)
+        //    {
+        //        Value = value;
+        //        Children = new List<GameStateTree>();
+        //    }
+
+        //    public void AddChild(GameStateTree child)
+        //    {
+        //        Children.Add(child);
+        //    }
+        //}
+
         private class GetMostProfitableCropArgs
         {
             public int Day;
@@ -184,6 +201,8 @@ namespace StardewCropCalculatorLibrary
 
         private Crop cheapestCrop = null;
 
+        private double memoryThreshold = 1.35;
+
         public GameStateCalendarFactory(int numDays, List<Crop> crops)
         {
             NumDays = numDays;
@@ -221,7 +240,10 @@ namespace StardewCropCalculatorLibrary
 
             var answer = await GetMostProfitableCropIterative();
 
-            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
+            answerCache.Clear();
+            daysToEvaluate.Clear();
+            numOperationsStat = 0;
+            numCacheHitsStat = 0;
 
             return answer;
         }
@@ -240,6 +262,22 @@ namespace StardewCropCalculatorLibrary
             while (daysToEvaluate.Count > 0)
             {
                 await Task.Yield();
+
+                // Cancel operation and garbage-collect if above memory limit.
+                if (numOperationsStat % 500 == 0 && CheckMemoryLimit())
+                {
+                    Console.WriteLine($"Error: canceled schedule generation due to high memory usage.");
+
+                    completedCalendars.Clear();
+                    answerCache.Clear();
+                    daysToEvaluate.Clear();
+
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers(); // Ensures finalizers are run
+                    GC.Collect(); // Collects again to free objects finalized in the first pass
+
+                    return Tuple.Create(-2.0, new GameStateCalendar(NumDays, startingTiles, startingGold));
+                }
 
                 var args = daysToEvaluate.Dequeue();
                 var day = args.Day;
@@ -285,8 +323,6 @@ namespace StardewCropCalculatorLibrary
                         {
                             // Be careful with increasing the threshold. In a past implementation, it counter-intuitively increased the state space from 2000 to 6000. In another implementation, it made the results incorrect.
                             //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(thisCropCalendar.GameStates[j]), goldLowerLimit);
-
-                            // startingGold appears to be a good threshold if we have unlimited tiles. But it should be reduced if limited tiles, ie a fraction of how much we can spend.
 
                             //if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
                             if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && thisCropCalendar.GameStates[j].Wallet >= startingGold * GoldInvestmentThreshold
@@ -470,11 +506,18 @@ namespace StardewCropCalculatorLibrary
             return false; // No planting actions possible in future days
         }
 
-        public static bool IsPersistent(Crop crop)
+        private bool CheckMemoryLimit()
         {
-            // TODO: input numDays
-            return crop.yieldRate > 0 && crop.yieldRate < 28;
-        }
+            long memoryInBytes = GC.GetTotalMemory(false);
+            double memoryInGB = memoryInBytes / (1024.0 * 1024.0 * 1024.0);
 
+            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
+            Console.WriteLine($"Memory usage: {memoryInGB:F2} GB");
+
+            if (memoryInGB >= memoryThreshold)
+                return true;
+            else
+                return false;
+        }
     }
 }

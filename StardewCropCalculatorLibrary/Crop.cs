@@ -25,7 +25,7 @@ namespace StardewCropCalculatorLibrary
         {
             get
             {
-                if (GameStateCalendarFactory.IsPersistent(this))
+                if (IsPersistent)
                 {
                     var numHarvests = NumHarvests(1, 28);
                     return (int)((numHarvests * sellPrice) - buyPrice);
@@ -40,7 +40,7 @@ namespace StardewCropCalculatorLibrary
 
         public int CurrentProfitIndex(int day)
         {
-            if (GameStateCalendarFactory.IsPersistent(this))
+            if (IsPersistent)
             {
                 var numHarvests = NumHarvests(day, 28);
                 return (int)((numHarvests * sellPrice) - buyPrice);
@@ -53,7 +53,7 @@ namespace StardewCropCalculatorLibrary
         }
 
         /// <summary>
-        /// 
+        /// Represents a crop type, like Wheat or Blueberry.
         /// </summary>
         /// <param name="timeToMaturity">time to crop's first yield</param>
         /// <param name="yieldRate">days between succesive yields after maturity</param>
@@ -107,6 +107,8 @@ namespace StardewCropCalculatorLibrary
 
             return numHarvests < 0 ? 0 : numHarvests;
         }
+
+        public bool IsPersistent => yieldRate > 0 && yieldRate < 28;
 
         public override string ToString()
         {
