@@ -234,34 +234,51 @@ namespace StardewCropCalculatorLibrary
             numOperationsStat = 0;
             numCacheHitsStat = 0;
 
+            bool infiniteGold = false;
+
             // If tiles are infinite but gold is still finite, then we can still calculate finite end wealth.
             if (availableTiles <= 0)
                 availableTiles = -1;
+
+            if (availableGold <= 0)
+            {
+                availableGold = 100000000;
+                infiniteGold = true;
+            }
 
             var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
             startingGold = availableGold;
             startingTiles = availableTiles;
 
+            Tuple<double, GameStateCalendar> wealth;
+
             if (useStrategy1)
             {
                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
 
-                Tuple<double, GameStateCalendar> answer = await GetMostProfitableCropIterative();
+                wealth = await GetMostProfitableCropIterative();
 
                 answerCache.Clear();
                 daysToEvaluate.Clear();
                 numOperationsStat = 0;
                 numCacheHitsStat = 0;
-
-                return answer;
             }
             else
             {
                 GetMostProfitableCropAlternate(1, calendar);
 
-                return Tuple.Create(calendar.Wealth, calendar);
+                wealth = Tuple.Create(calendar.Wealth, calendar);
             }
+
+            if (infiniteGold)
+            {
+                double newProfit = wealth.Item1 - availableGold;
+
+                wealth = Tuple.Create(newProfit, wealth.Item2);
+            }
+
+            return wealth;
         }
 
         /// <summary>

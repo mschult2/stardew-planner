@@ -453,25 +453,25 @@
     }
 
     /* Starting crops are Summer crops. */
-    // private static readonly List<Crop> DefaultCrops = new()
-    // {
-    //     // PPI comparison. Based on: 2000g, 100t, profit 29.7k.
-    //     // Best 5000g/100t profit I have is 41k.
-    //     new Crop("Blueberry", 13, 4, 80, 150), // solo 16k
-    //     new Crop("Hot Pepper", 5, 3, 40, 40), // solo 24k
-    //     new Crop("Melon", 12, 1000, 80, 250), // solo 17.5k
-    //     new Crop("Hops", 11, 1, 60, 25), // solo 13k
-    //     new Crop("Tomato", 11, 4, 50, 60), // solo 13.5k
-    //     new Crop("Radish", 6, 1000, 40, 90), // solo 17.5k
-    //     new Crop("Poppy", 7, 1000, 100, 140), // solo 3.5k
-    //     new Crop("Spangle", 8, 1000, 50, 90), // solo 8.5k
-    //     new Crop("Starfruit", 13, 1000, 400, 750), // solo 5k
-    //     new Crop("Wheat", 4, 1000, 10, 25), // solo 7.5k
-    //     new Crop("Corn", 14, 4, 150, 50), // solo 650 (in the 2nd month you'd make 4.5k)
-    // };
+    private static readonly List<Crop> DefaultCrops = new()
+    {
+        // PPI comparison. Based on: 2000g, 100t, profit 29.7k.
+        // Best 5000g/100t profit I have is 41k.
+        new Crop("Blueberry", 13, 4, 80, 150), // solo 16k
+        new Crop("Hot Pepper", 5, 3, 40, 40), // solo 24k
+        new Crop("Melon", 12, 1000, 80, 250), // solo 17.5k
+        new Crop("Hops", 11, 1, 60, 25), // solo 13k
+        new Crop("Tomato", 11, 4, 50, 60), // solo 13.5k
+        new Crop("Radish", 6, 1000, 40, 90), // solo 17.5k
+        new Crop("Poppy", 7, 1000, 100, 140), // solo 3.5k
+        new Crop("Spangle", 8, 1000, 50, 90), // solo 8.5k
+        new Crop("Starfruit", 13, 1000, 400, 750), // solo 5k
+        new Crop("Wheat", 4, 1000, 10, 25), // solo 7.5k
+        new Crop("Corn", 14, 4, 150, 50), // solo 650 (in the 2nd month you'd make 4.5k)
+    };
 
-    // private double AvailableGold = 5000;
-    // private int AvailableTiles = 100;
+    private double AvailableGold = 5000;
+    private int AvailableTiles = 100;
 
     /* Test 1: Answer is a few peps, melon, then a last pep. Profit 167k.
     * SIG DIGIT: 2 sig dig takes 3m19s, 1 sig take takes only 35s!
@@ -586,22 +586,22 @@
     /* Test 8: High TG 0.5
      * PPI results: 51,000,000g. Schedule: D1 1m wheat, D6 250k wheat, D11 156k pep, D17 156k pep, D20 156k rad, D23 31k wheat
     */
-    private static readonly List<Crop> DefaultCrops = new()
-    {
-        new Crop("Blueberry", 13, 4, 80, 150),
-        new Crop("Hot Pepper", 5, 3, 40, 40),
-        new Crop("Melon", 12, 1000, 80, 250),
-        new Crop("Hops", 11, 1, 60, 25),
-        new Crop("Tomato", 11, 4, 50, 60),
-        new Crop("Radish", 6, 1000, 40, 90),
-        new Crop("Poppy", 7, 1000, 100, 140),
-        new Crop("Spangle", 8, 1000, 50, 90),
-        new Crop("Starfruit", 13, 1000, 400, 750),
-        new Crop("Wheat", 4, 1000, 10, 25),
-        new Crop("Corn", 14, 4, 150, 50),
-    };
-    private double AvailableGold = 1000000;
-    private int AvailableTiles = 500000;
+    // private static readonly List<Crop> DefaultCrops = new()
+    // {
+    //     new Crop("Blueberry", 13, 4, 80, 150),
+    //     new Crop("Hot Pepper", 5, 3, 40, 40),
+    //     new Crop("Melon", 12, 1000, 80, 250),
+    //     new Crop("Hops", 11, 1, 60, 25),
+    //     new Crop("Tomato", 11, 4, 50, 60),
+    //     new Crop("Radish", 6, 1000, 40, 90),
+    //     new Crop("Poppy", 7, 1000, 100, 140),
+    //     new Crop("Spangle", 8, 1000, 50, 90),
+    //     new Crop("Starfruit", 13, 1000, 400, 750),
+    //     new Crop("Wheat", 4, 1000, 10, 25),
+    //     new Crop("Corn", 14, 4, 150, 50),
+    // };
+    // private double AvailableGold = 1000000;
+    // private int AvailableTiles = 500000;
 
     /* Test 9: Very High TG 4.0
      */
@@ -704,7 +704,7 @@
     {
         ClearSchedule();
 
-        if (!Crops.Any() || AvailableGold <= 0)
+        if (!Crops.Any() || AvailableGold < 0)
             return;
 
         IsBusy = true;
@@ -721,7 +721,7 @@
                 var calendar = wealthAndCalendar.Item2;
                 Profit = totalWealth - AvailableGold;
                 Profit = totalWealth == -2 ? -2 : Profit;
-                InvestmentMultiplier = AvailableGold != 0 ? totalWealth / AvailableGold : InvestmentMultiplier;
+                InvestmentMultiplier = AvailableGold != 0 ? totalWealth / AvailableGold : -1;
 
                 // Copy to UI elements: Schedule, ScheduleDetails, PlantingDays/HarvestDays
                 if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
