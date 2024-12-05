@@ -14,6 +14,7 @@ namespace StardewCropCalculatorLibrary
 
         public double buyPrice { get; set; }
         public double sellPrice { get; set; }
+        public bool IsEnabled { get; set; } = true;
 
         /// <summary>
         /// Per-tile profitability index. How profitable a tile is, if we only plant this crop on it the entire month.

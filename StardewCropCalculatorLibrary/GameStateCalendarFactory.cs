@@ -213,7 +213,7 @@ namespace StardewCropCalculatorLibrary
         public GameStateCalendarFactory(int numDays, List<Crop> crops)
         {
             NumDays = numDays;
-            Crops = crops;
+            Crops = crops.Where(c => c.IsEnabled).ToList();
 
             // Find cheapest crop
             if (Crops != null && Crops.Count > 0)

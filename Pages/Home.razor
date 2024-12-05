@@ -67,7 +67,8 @@
             {
                 <li class="crop-item">
                     <div class="crop-content">
-                        <span>
+                        <input type="checkbox" checked="@crop.IsEnabled" @onchange="(e => ToggleCropState(crop, e))" />
+                        <span class="@(!crop.IsEnabled ? "disabled-crop" : "")">
                             @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g
                             @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"))
                         </span>
@@ -364,11 +365,34 @@
 
     .crop-content {
         display: grid; /* Use CSS Grid */
-        grid-template-columns: auto 120px; /* Text takes remaining space; button fixed width */
-        align-items: center; /* Vertically align items */
-        gap: 10px; /* Add spacing between text and button */
+        grid-template-columns: auto 1fr 120px; /* Define grid columns */
+        grid-template-areas:
+            "checkbox text button"; /* Assign grid areas */
+        align-items: center; /* Align items vertically */
+        gap: 10px; /* Add space between items */
         max-width: 800px; /* Constrain the total width of the container */
     }
+
+        .crop-content input[type="checkbox"] {
+            grid-area: checkbox; /* Assign to checkbox area */
+            width: 18px; /* Compact size */
+            height: 18px; /* Compact size */
+            margin: 0; /* Remove default margins */
+            cursor: pointer; /* Pointer cursor */
+        }
+
+        .crop-content span {
+            grid-area: text; /* Assign to text area */
+            overflow: hidden; /* Prevent overflow */
+            text-overflow: ellipsis; /* Add ellipsis for long text */
+            white-space: nowrap; /* Prevent text wrapping */
+        }
+
+        .crop-content button {
+            grid-area: button; /* Assign to button area */
+            justify-self: end; /* Align the button to the right */
+        }
+
 
     button:disabled,
     input:disabled {
@@ -403,6 +427,11 @@
         height: 130px;
         animation: spin 1s linear infinite;
         margin-bottom: 20px; /* Space between spinner and text */
+    }
+
+    .disabled-crop {
+        color: gray;
+        text-decoration: line-through;
     }
 
     @@keyframes spin {
@@ -537,18 +566,18 @@
     //     new Crop("Starfruit", 13, 1000, 400, 750),
     //     new Crop("Blueberry", 13, 4, 80, 150),
     //     new Crop("Hot Pepper", 5, 3, 40, 40),
-    //     new Crop("Melon", 12, 1000, 80, 250),
-    //     new Crop("Hops", 11, 1, 60, 25),
-    //     new Crop("Tomato", 11, 4, 50, 60),
-    // };
-    // private double AvailableGold = 1500;
-    // private int AvailableTiles = 100;
+     //     new Crop("Melon", 12, 1000, 80, 250),
+     //     new Crop("Hops", 11, 1, 60, 25),
+     //     new Crop("Tomato", 11, 4, 50, 60),
+     // };
+     // private double AvailableGold = 1500;
+     // private int AvailableTiles = 100;
 
-    /* Test 6: Stress Test
+     /* Test 6: Stress Test
      * ERROR: After 7min and 36,000 operations: "Garbage collector could not allocate 65536u bytes of memory for major heap section". (Browser was only using ~2GB) (17,585 cache hits)
      * Same with cache disabled. Memeory usage 1.75 GB.
-     * Ah it's because a Chrome browser tab limits the WebAssembly heap memory to 2 GB. Javascript gets more, 4 GB!
-     * Results according to PPI strat, may not be correct: profit 89k. D1 125 pep, D7 125 pep, D10 125 pep, D13 star.
+    * Ah it's because a Chrome browser tab limits the WebAssembly heap memory to 2 GB. Javascript gets more, 4 GB!
+    * Results according to PPI strat, may not be correct: profit 89k. D1 125 pep, D7 125 pep, D10 125 pep, D13 star.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -562,14 +591,14 @@
     //     new Crop("Spangle", 8, 1000, 50, 90),
     //     new Crop("Starfruit", 13, 1000, 400, 750),
     //     new Crop("Wheat", 4, 1000, 10, 25),
-    //     new Crop("Corn", 14, 4, 150, 50),
-    // };
-    // private double AvailableGold = 5000;
-    // private int AvailableTiles = 400;
+     //     new Crop("Corn", 14, 4, 150, 50),
+     // };
+     // private double AvailableGold = 5000;
+     // private int AvailableTiles = 400;
 
-    /* Test 7: Balanced TG 0.09
-     * IM results: profit 102k. D1 125 pep, d7 62 blue, d10 263 wheat, d15 174 melon, d16 63 melon.
-     * PPI results: profit 93k. D1 125 pep, D7 125 pep, D10 125 pep, D13 75 melon.
+     /* Test 7: Balanced TG 0.09
+    * IM results: profit 102k. D1 125 pep, d7 62 blue, d10 263 wheat, d15 174 melon, d16 63 melon.
+    * PPI results: profit 93k. D1 125 pep, D7 125 pep, D10 125 pep, D13 75 melon.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -579,12 +608,12 @@
     //     new Crop("Tomato", 11, 4, 50, 60),
     //     new Crop("Hot Pepper", 5, 3, 40, 40),
     //     new Crop("Wheat", 4, 1000, 10, 25),
-    // };
-    // private double AvailableGold = 5000;
-    // private int AvailableTiles = 450;
+     // };
+     // private double AvailableGold = 5000;
+     // private int AvailableTiles = 450;
 
-    /* Test 8: High TG 0.5
-     * PPI results: 51,000,000g. Schedule: D1 1m wheat, D6 250k wheat, D11 156k pep, D17 156k pep, D20 156k rad, D23 31k wheat
+     /* Test 8: High TG 0.5
+    * PPI results: 51,000,000g. Schedule: D1 1m wheat, D6 250k wheat, D11 156k pep, D17 156k pep, D20 156k rad, D23 31k wheat
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -601,10 +630,10 @@
     //     new Crop("Corn", 14, 4, 150, 50),
     // };
     // private double AvailableGold = 1000000;
-    // private int AvailableTiles = 500000;
+     // private int AvailableTiles = 500000;
 
     /* Test 9: Very High TG 4.0
-     */
+    */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("Blueberry", 13, 4, 80, 150),
@@ -647,6 +676,13 @@
     protected override void OnInitialized()
     {
         ClearSchedule();
+    }
+
+    private void ToggleCropState(Crop crop, ChangeEventArgs e)
+    {
+        Console.WriteLine($"TOGGLE CROP STATE: {crop.name}");
+        crop.IsEnabled = (bool)e.Value; // Update the crop's IsEnabled property
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
     }
 
     // Add a new crop to the list
