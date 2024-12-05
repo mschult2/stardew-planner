@@ -16,8 +16,9 @@ namespace StardewCropCalculatorLibrary
         public double sellPrice { get; set; }
 
         /// <summary>
-        /// Per-tile profitability index. How much money this crop makes occupying one tile over the course of the month.
-        /// Note that this metric is misleading, because it's only useful if all tiles are filled.
+        /// Per-tile profitability index. How profitable a tile is, if we only plant this crop on it the entire month.
+        ///
+        /// Note: this metric is misleading, because it's only useful if all tiles are filled.
         /// But if you switch to another crop with a better TPI, that crop might not fill all the tiles at the same rate.
         /// So it's only useful in situations where available tiles are so low, ANY crop can fill them up almost immediately.
         /// </summary>
@@ -38,6 +39,9 @@ namespace StardewCropCalculatorLibrary
             }
         }
 
+        /// <summary>
+        /// Per-tile profitability index starting on a specific day.
+        /// </summary>
         public int CurrentProfitIndex(int day)
         {
             if (IsPersistent)
@@ -50,6 +54,18 @@ namespace StardewCropCalculatorLibrary
                 int numHarvests = (29 - day) / (timeToMaturity + 1);
                 return (int)((numHarvests * sellPrice) - (numHarvests * buyPrice));
             }
+        }
+
+        /// <summary>
+        /// The real profit, in gold, if we plant the entire farm with this crop.
+        /// </summary>
+        public double CurrentProfit(int day, int availableTiles, double availableGold, out int numToPlant)
+        {
+            int unitsCanAfford = ((int)(availableGold / buyPrice));
+            bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
+            numToPlant = goldLimited ? unitsCanAfford : availableTiles;
+
+            return numToPlant * CurrentProfitIndex(day);
         }
 
         /// <summary>
@@ -92,7 +108,6 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         /// <param name="dayPlanted">day crop is planted</param>
         /// <param name="maxDays">days in the season</param>
-        /// <returns></returns>
         public int NumHarvests(int dayPlanted, int maxDays)
         {
             if (dayPlanted < 1 || maxDays < 1 || dayPlanted > maxDays)
@@ -106,6 +121,26 @@ namespace StardewCropCalculatorLibrary
                 numHarvests = (int)((maxDays - dayPlanted - timeToMaturity + yieldRate) / yieldRate); // rounds to floor
 
             return numHarvests < 0 ? 0 : numHarvests;
+        }
+
+        public List<int> HarvestDays(int plantDay)
+        {
+            List<int> harvestDays = new List<int>();
+
+            int harvestDate = plantDay + timeToMaturity;
+
+            if (harvestDate <= 28)
+            {
+                harvestDays.Add(harvestDate);
+
+                while (harvestDate + yieldRate <= 28)
+                {
+                    harvestDate += yieldRate;
+                    harvestDays.Add(harvestDate);
+                }
+            }
+
+            return harvestDays;
         }
 
         public bool IsPersistent => yieldRate > 0 && yieldRate < 28;

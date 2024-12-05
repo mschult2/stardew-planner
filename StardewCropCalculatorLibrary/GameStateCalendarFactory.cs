@@ -6,6 +6,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Security.Claims;
+using System.Data.SqlTypes;
 
 namespace StardewCropCalculatorLibrary
 {
@@ -13,6 +15,8 @@ namespace StardewCropCalculatorLibrary
     public class GameStateCalendar
     {
         public readonly int NumDays;
+
+        public double Wealth => GameStates[NumDays + 1].Wallet;
 
         /// <summary> The state of our farm on a particular day. Ie, how many plants, free tiles, and gold we have. </summary>
         public readonly SortedDictionary<int, GameState> GameStates = new SortedDictionary<int, GameState>();
@@ -130,18 +134,8 @@ namespace StardewCropCalculatorLibrary
             Count = cropCount;
             PlantDay = plantDay;
 
-            int harvestDate = plantDay + cropType.timeToMaturity;
-
-            if (harvestDate <= 28)
-                HarvestDays.Add(harvestDate);
-            else
-                return;
-
-            while (harvestDate + cropType.yieldRate <= 28)
-            {
-                harvestDate += cropType.yieldRate;
-                HarvestDays.Add(harvestDate);
-            }
+            foreach (var harvestDay in cropType.HarvestDays(plantDay))
+                HarvestDays.Add(harvestDay);
         }
 
         public PlantBatch(PlantBatch otherPlantBatch)
@@ -214,6 +208,8 @@ namespace StardewCropCalculatorLibrary
 
         private double memoryThreshold = 1.38;
 
+        private bool useStrategy1 = false;
+
         public GameStateCalendarFactory(int numDays, List<Crop> crops)
         {
             NumDays = numDays;
@@ -247,16 +243,25 @@ namespace StardewCropCalculatorLibrary
             startingGold = availableGold;
             startingTiles = availableTiles;
 
-            daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
+            if (useStrategy1)
+            {
+                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
 
-            var answer = await GetMostProfitableCropIterative();
+                Tuple<double, GameStateCalendar> answer = await GetMostProfitableCropIterative();
 
-            answerCache.Clear();
-            daysToEvaluate.Clear();
-            numOperationsStat = 0;
-            numCacheHitsStat = 0;
+                answerCache.Clear();
+                daysToEvaluate.Clear();
+                numOperationsStat = 0;
+                numCacheHitsStat = 0;
 
-            return answer;
+                return answer;
+            }
+            else
+            {
+                GetMostProfitableCropAlternate(1, calendar);
+
+                return Tuple.Create(calendar.Wealth, calendar);
+            }
         }
 
         /// <summary>
@@ -264,7 +269,6 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         private async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCropIterative()
         {
-            List<GameStateCalendar> completedCalendars = new List<GameStateCalendar>(300);
             double bestWealth = 0;
             GameStateCalendar bestCalendar = null;
 
@@ -279,7 +283,6 @@ namespace StardewCropCalculatorLibrary
                 {
                     Console.WriteLine($"Error: canceled schedule generation due to high memory usage.");
 
-                    completedCalendars.Clear();
                     answerCache.Clear();
                     daysToEvaluate.Clear();
 
@@ -328,7 +331,7 @@ namespace StardewCropCalculatorLibrary
                     if (unitsToPlant > 0)
                     {
                         // Update game state based on the current purchase.
-                        UpdateCalendar(thisCropCalendar, unitsToPlant, crop, availableTiles, day);
+                        UpdateCalendar(thisCropCalendar, unitsToPlant, crop, day);
 
                         // Queue up updating game state based on subsequent purchases.
                         for (int j = day + 1; j <= numDays; ++j)
@@ -352,8 +355,6 @@ namespace StardewCropCalculatorLibrary
                     // If no further action can be taken for all crops, then a schedule has been completed!
                     if (thisCropScheduleCompleted)
                     {
-                        completedCalendars.Add(thisCropCalendar);
-
                         double thisCropWealth = thisCropCalendar?.GameStates[29].Wallet ?? 0;
 
                         if (thisCropWealth > bestWealth)
@@ -372,10 +373,69 @@ namespace StardewCropCalculatorLibrary
             return Tuple.Create(bestWealth, bestCalendar);
         }
 
-        private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int availableTiles, int day)
+        /// <summary>
+        /// Return the optimal schedule.
+        /// </summary>
+        private void GetMostProfitableCropAlternate(in int startDay, GameStateCalendar calendar)
+        {
+            SortedSet<int> daysOfInterest = new SortedSet<int>() { startDay };
+
+            // Find best crop schedule
+            for (int day = startDay; day <= NumDays; ++day)
+            {
+                if (!daysOfInterest.Contains(day))
+                    continue;
+
+                var curGameState = calendar.GameStates[day];
+
+                // Find best crop for this day
+                double bestProfitMetric = 0;
+                Crop bestCrop = null;
+                int bestNumToPlant = 0;
+
+                foreach (var crop in Crops)
+                {
+                    double curProfitMetric = crop.CurrentProfit(day, curGameState.FreeTiles, curGameState.Wallet, out int numToPlant);
+
+                    if (curProfitMetric > bestProfitMetric)
+                    {
+                        bestProfitMetric = curProfitMetric;
+                        bestCrop = crop;
+                        bestNumToPlant = numToPlant;
+                    }
+                }
+
+                // Add best crop's paydays
+                if (bestCrop != null)
+                {
+                    UpdateCalendar(calendar, bestNumToPlant, bestCrop, day);
+
+                    foreach (int harvestDay in bestCrop.HarvestDays(day))
+                    {
+                        if (harvestDay <= NumDays)
+                            daysOfInterest.Add(harvestDay + 1);
+                    }
+
+                    //Console.WriteLine($"Day {day}: Plant {bestNumToPlant} {bestCrop}. availableTiles: {curGameState.FreeTiles}, availableGold: {curGameState.Wallet}");
+                }
+                // If no profitable crop is left, then we're done
+                else
+                {
+                    break;
+                }
+            }
+
+            //Console.WriteLine($"Summary Day {NumDays + 1}: availableTiles: {calendar.GameStates[NumDays + 1].FreeTiles}, availableGold: {calendar.GameStates[NumDays + 1].Wallet}");
+
+            return;
+        }
+
+        private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int day)
         {
             if (unitsToPlant <= 0)
                 return;
+
+            int availableTiles = calendar.GameStates[day].FreeTiles;
 
             // Modify current day state.
             double cost = unitsToPlant * crop.buyPrice;
