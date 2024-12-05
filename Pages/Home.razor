@@ -153,13 +153,16 @@
                                     // Determine the class for planting day
                                     string cellClass = plantingDay ? "planting-day" : "";
 
-                                        <td class="@cellClass">
-                                        <div style="position: relative;">
+                                    <td class="@cellClass">
+                                        <div style="position: relative; height: 100%; width: 100%;">
+                                            <!-- Ensure the parent fills the cell -->
                                             @if (HarvestDays[day])
                                             {
                                                 <span class="harvest-marker">Harvest</span>
                                             }
-                                            <div><strong>@($"Day {day}{(plantingDay ? " - Plant" : "")}")</strong></div>
+                                            <div style="text-align: center; padding-top: 12px;">
+                                                <strong>@($"Day {day}{(plantingDay ? " - Plant" : "")}")</strong>
+                                            </div>
 
                                             @if (crops != null && crops.Count > 0)
                                             {
@@ -167,16 +170,17 @@
                                                 {
                                                     @if (plantingDetails != null && plantingDetails.cropsNumberToPlant != null && plantingDetails.cropsNumberToPlant.Count > cropIndex && plantingDetails.cropsNumberToPlant[cropIndex] > 0)
                                                     {
-                                                        <div>@($"{crops[cropIndex]} ({plantingDetails.cropsNumberToPlant[cropIndex].ToString("N0")})")</div>
+                                                        <div style="text-align: center;">@($"{crops[cropIndex]} ({plantingDetails.cropsNumberToPlant[cropIndex].ToString("N0")})")</div>
                                                     }
                                                     else
                                                     {
-                                                        <div>@($"{crops[cropIndex]}")</div>
+                                                        <div style="text-align: center;">@($"{crops[cropIndex]}")</div>
                                                     }
                                                 }
                                             }
                                         </div>
                                     </td>
+
                                 }
                             </tr>
                         }
@@ -288,12 +292,12 @@
 
     /* Style for harvest marker */
     .harvest-marker {
-        position: absolute;
-        top: 2px;
-        left: 0px;
-        font-size: 14px;
-        font-weight: bold;
-        color: #ff9933; /* Orange */
+        position: absolute; /* Position relative to the parent container */
+        top: -5px; /* Move it slightly down from the top */
+        left: -2px; /* Move it slightly right from the left */
+        font-size: 14px; /* Adjust size if needed */
+        font-weight: bold; /* Keep it bold */
+        color: #ff9933; /* Orange color */
     }
 
     /* Delete All button style */
