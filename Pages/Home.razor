@@ -520,16 +520,17 @@
         new Crop("Garlic", timeToMaturity: 4, yieldRate: 1000, buyPrice: 40, sellPrice: 60),
         new Crop("Kale", timeToMaturity: 6, yieldRate: 1000, buyPrice: 70, sellPrice: 110),
         new Crop("Parsnip", timeToMaturity: 4, yieldRate: 1000, buyPrice: 20, sellPrice: 35),
-        // Potato base sell price 80g, but yields 1.25 units on average
+        // Potato base sell price 80g, but yields 1.25 units on average.
         new Crop("Potato", timeToMaturity: 6, yieldRate: 1000, buyPrice: 50, sellPrice: 100),
         new Crop("Rhubarb", timeToMaturity: 13, yieldRate: 1000, buyPrice: 100, sellPrice: 220),
         new Crop("Tulip", timeToMaturity: 6, yieldRate: 1000, buyPrice: 20, sellPrice: 30),
-        // Rice base sell price 30g, but yields 1.61 on average (until max Farming level 10)
+        // Rice base sell price 30g, but yields 1.61 on average (until max Farming level 10).
         new Crop("Unmilled Rice", timeToMaturity: 8, yieldRate: 1000, buyPrice: 40, sellPrice: 48.3),
-        // new Crop("Carrot", timeToMaturity: 3, yieldRate: 1000, buyPrice: 1, sellPrice: 35),
+        // Can't buy.
+        new Crop("Carrot", timeToMaturity: 3, yieldRate: 1000, buyPrice: 0, sellPrice: 35, isEnabled: false),
         new Crop("Green Bean", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 40),
         new Crop("Strawberry", timeToMaturity: 8, yieldRate: 4, buyPrice: 100, sellPrice: 120),
-        // Spring and summer
+        // Spring and summer.
         new Crop("Coffee Bean", timeToMaturity: 10, yieldRate: 2, buyPrice: 2500, sellPrice: 60),
 
         /* Summer crops */
@@ -550,7 +551,7 @@
         new Crop("Corn", 14, 4, 150, 50, isEnabled: false), // solo 650 (in the 2nd month you'd make 4.5k)
 
         /* Fall crops */
-        // Fall and summer
+        // Sunflower is in fall and summer.
         // Also note that the sunflow yields every 8 days and dies, but it has an average 100% change of dropping 1 seed.
         // This makes it like a persistent crop with a 9 day yield rate.
         new Crop("Sunflower", timeToMaturity: 8, yieldRate: 9, buyPrice: 200, sellPrice: 80, isEnabled: false),
@@ -560,19 +561,21 @@
         new Crop("Pumpkin", timeToMaturity: 13, yieldRate: 1000, buyPrice: 100, sellPrice: 320, isEnabled: false),
         new Crop("Sweet Gem Berry", timeToMaturity: 24, yieldRate: 1000, buyPrice: 1000, sellPrice: 3000, isEnabled: false),
         new Crop("Yam", timeToMaturity: 10, yieldRate: 1000, buyPrice: 60, sellPrice: 160, isEnabled: false),
-        // Sells for 75g with yield of 2.11
+        // Sells for 75g with yield of 2.11.
         new Crop("Cranberries", timeToMaturity: 7, yieldRate: 5, buyPrice: 240, sellPrice: 158.3, isEnabled: false),
         new Crop("Eggplant", timeToMaturity: 5, yieldRate: 5, buyPrice: 20, sellPrice: 60, isEnabled: false),
-        //new Crop("Broccoli", timeToMaturity: 8, yieldRate: 4, buyPrice: 0, sellPrice: 70, isEnabled: false),
+        // Can't buy.
+        new Crop("Broccoli", timeToMaturity: 8, yieldRate: 4, buyPrice: 0, sellPrice: 70, isEnabled: false),
         new Crop("Grape", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 80, isEnabled: false),
         new Crop("Beet", timeToMaturity: 6, yieldRate: 1000, buyPrice: 20, sellPrice: 100, isEnabled: false),
         new Crop("Amaranth", timeToMaturity: 7, yieldRate: 1000, buyPrice: 70, sellPrice: 150, isEnabled: false),
 
         /* Winter crops */
-        // new Crop("Powdermelon", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 20, isEnabled: false),
-        // Can plant in any season
+        // Can't buy.
+        new Crop("Powdermelon", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 20, isEnabled: false),
+        // Can plant in any season. Can't buy.
         // A fiber sells for 5g, and produces 5.5 units on average
-        // new Crop("Fiber", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 27.5, isEnabled: false),
+        new Crop("Fiber", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 27.5, isEnabled: false),
     };
 
     private double AvailableGold = 5000;

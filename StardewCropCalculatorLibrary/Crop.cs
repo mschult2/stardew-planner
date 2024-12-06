@@ -46,9 +46,25 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         public double CurrentProfit(int day, int availableTiles, double availableGold, int numDays, out int numToPlant)
         {
-            int unitsCanAfford = ((int)(availableGold / buyPrice));
-            bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
-            numToPlant = goldLimited ? unitsCanAfford : availableTiles;
+            if (buyPrice > 0)
+            {
+                int unitsCanAfford = (int)(availableGold / buyPrice);
+                bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
+                numToPlant = goldLimited ? unitsCanAfford : availableTiles;
+            }
+            else
+            {
+                if (availableTiles != -1)
+                {
+                    numToPlant = availableTiles;
+                }
+                else
+                {
+                    Console.WriteLine("[Crop.CurrentProfit] Warning: can't plant free crop if infinite tiles, becuase that would be infinite plants.");
+                    numToPlant = 0;
+                }
+
+            }
 
             return numToPlant * CurrentProfitIndex(day, numDays);
         }
