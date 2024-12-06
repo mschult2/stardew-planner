@@ -846,7 +846,7 @@
             // Calculate schedule with ROI formula (fast, but doesn't support tile limit)
             else
             {
-                var factory = new PlantScheduleFactory(NumDays);
+                var factory = new PlantScheduleFactory(NumDays, CurrentDay);
 
                 InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
 

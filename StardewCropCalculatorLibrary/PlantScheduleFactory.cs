@@ -35,11 +35,14 @@ namespace StardewCropCalculatorLibrary
 
         private MemoTable memo;
 
-        public PlantScheduleFactory(int numDays)
-        {
-            if (numDays < 1) AppUtils.Fail("PlantScheduleFactory(numDays) - numDays must be greater than 0");
+        private int StartDay;
 
-            this.numDays = numDays;
+        public PlantScheduleFactory(int numDays, int startDay)
+        {
+            if (numDays < 1 || startDay >= numDays) AppUtils.Fail("PlantScheduleFactory(numDays) - numDays must be greater than 0");
+
+            StartDay = startDay;
+            this.numDays = numDays - startDay + 1;
 
             // Initialize memo table
             memo.schedule = new PlantSchedule(numDays);
@@ -99,7 +102,19 @@ namespace StardewCropCalculatorLibrary
 
             // Return memo, which is now filled out with the best schedule.
             schedule = new PlantSchedule(memo.schedule);
-            return memo.cumMultiple[1];
+            var investmentMultiple = memo.cumMultiple[1];
+
+            if (StartDay > 1)
+            {
+                var shiftedSchedule = new PlantSchedule(numDays + StartDay - 1);
+
+                for (int i = 1; i <= numDays; ++i)
+                    shiftedSchedule.AddCrop(i + StartDay - 1, schedule.GetCrop(i));
+
+                schedule = shiftedSchedule;
+            }
+
+            return investmentMultiple;
         }
 
         /// This method tells you the actual days to plant on for the last schedule computed. Based on when you get money from harvests.
@@ -107,6 +122,8 @@ namespace StardewCropCalculatorLibrary
         /// NOTE: this is a nonessential detail, since you can just buy the best crop of the day whenever you have money. 
         public void GetPlantingDays(out bool[] plantingDays, out bool[] harvestDays)
         {
+            int curNumDay = numDays + StartDay - 1;
+
             plantingDays = new bool[numDays + 1];
             harvestDays = new bool[numDays + 1];
             bool[] profitDays = new bool[numDays + 1];
@@ -145,6 +162,24 @@ namespace StardewCropCalculatorLibrary
                 }
 
                 ++day;
+            }
+
+            // If not starting on day 1, convert back to full days
+            if (StartDay > 1)
+            {
+                var shiftedPlantingDays = new bool[numDays + StartDay];
+
+                for (int i = 1; i <= numDays; ++i)
+                    shiftedPlantingDays[i + StartDay - 1] = plantingDays[i];
+
+                plantingDays = shiftedPlantingDays;
+
+                var shiftedHarvestDays = new bool[numDays + StartDay];
+
+                for (int i = 1; i <= numDays; ++i)
+                    shiftedHarvestDays[i + StartDay - 1] = harvestDays[i];
+
+                harvestDays = shiftedHarvestDays;
             }
         }
     }
