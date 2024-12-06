@@ -803,7 +803,7 @@
     private void AddCrop()
     {
         if (!string.IsNullOrWhiteSpace(NewCropName)
-        && NewCropSellPrice > 0 && NewCropBuyPrice > 0 && NewCropTimeToMaturity > 0 && NewCropYieldRate >= 0
+        && NewCropSellPrice > 0 && NewCropBuyPrice >= 0 && NewCropTimeToMaturity > 0 && NewCropYieldRate >= 0
         && NewCropTimeToMaturity < NumDays && NewCropYieldRate < NumDays)
         {
             int processedYieldRate = NewCropYieldRate;
@@ -811,7 +811,7 @@
             if (NewCropYieldRate <= 0)
                 processedYieldRate = 1000;
 
-            Crops.Add(new Crop(NewCropName, NewCropTimeToMaturity, processedYieldRate, NewCropBuyPrice, NewCropSellPrice));
+            Crops.Insert(0, new Crop(NewCropName, NewCropTimeToMaturity, processedYieldRate, NewCropBuyPrice, NewCropSellPrice));
 
             // Clear the form fields
             NewCropName = string.Empty;
