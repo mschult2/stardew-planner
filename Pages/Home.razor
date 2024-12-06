@@ -73,7 +73,7 @@
         <ul>
             @foreach (var crop in Crops)
             {
-                <li class="crop-item">
+                <li class="crop-item @crop.Season?.ToLower()">
                     <div class="crop-content">
                         <input type="checkbox" checked="@crop.IsEnabled" @onchange="(e => ToggleCropState(crop, e))" />
                         <span class="@(!crop.IsEnabled ? "disabled-crop" : "")">
@@ -385,6 +385,19 @@
         margin-bottom: 2px; /* Add spacing between list items */
     }
 
+        .crop-item.spring {
+            color: #2E8B57;
+        }
+        .crop-item.summer {
+            color: #DAA520;
+        }
+        .crop-item.fall {
+            color: #D2691E;
+        }
+        .crop-item.winter {
+            color: #4682B4;
+        }
+
     .crop-content {
         display: grid; /* Use CSS Grid */
         grid-template-columns: auto 1fr 120px; /* Define grid columns */
@@ -515,67 +528,67 @@
     private static readonly List<Crop> DefaultCrops = new()
     {
         /* Spring crops */
-        new Crop("Blue Jazz", timeToMaturity: 7, yieldRate: 1000, buyPrice: 30, sellPrice: 50),
-        new Crop("Cauliflower", timeToMaturity: 12, yieldRate: 1000, buyPrice: 80, sellPrice: 175),
-        new Crop("Garlic", timeToMaturity: 4, yieldRate: 1000, buyPrice: 40, sellPrice: 60),
-        new Crop("Kale", timeToMaturity: 6, yieldRate: 1000, buyPrice: 70, sellPrice: 110),
-        new Crop("Parsnip", timeToMaturity: 4, yieldRate: 1000, buyPrice: 20, sellPrice: 35),
+        new Crop("Blue Jazz", timeToMaturity: 7, yieldRate: 1000, buyPrice: 30, sellPrice: 50, season: "Spring"),
+        new Crop("Cauliflower", timeToMaturity: 12, yieldRate: 1000, buyPrice: 80, sellPrice: 175, season: "Spring"),
+        new Crop("Garlic", timeToMaturity: 4, yieldRate: 1000, buyPrice: 40, sellPrice: 60, season: "Spring"),
+        new Crop("Kale", timeToMaturity: 6, yieldRate: 1000, buyPrice: 70, sellPrice: 110, season: "Spring"),
+        new Crop("Parsnip", timeToMaturity: 4, yieldRate: 1000, buyPrice: 20, sellPrice: 35, season: "Spring"),
         // Potato base sell price 80g, but yields 1.25 units on average.
-        new Crop("Potato", timeToMaturity: 6, yieldRate: 1000, buyPrice: 50, sellPrice: 100),
-        new Crop("Rhubarb", timeToMaturity: 13, yieldRate: 1000, buyPrice: 100, sellPrice: 220),
-        new Crop("Tulip", timeToMaturity: 6, yieldRate: 1000, buyPrice: 20, sellPrice: 30),
+        new Crop("Potato", timeToMaturity: 6, yieldRate: 1000, buyPrice: 50, sellPrice: 100, season: "Spring"),
+        new Crop("Rhubarb", timeToMaturity: 13, yieldRate: 1000, buyPrice: 100, sellPrice: 220, season: "Spring"),
+        new Crop("Tulip", timeToMaturity: 6, yieldRate: 1000, buyPrice: 20, sellPrice: 30, season: "Spring"),
         // Rice base sell price 30g, but yields 1.61 on average (until max Farming level 10).
-        new Crop("Unmilled Rice", timeToMaturity: 8, yieldRate: 1000, buyPrice: 40, sellPrice: 48.3),
+        new Crop("Unmilled Rice", timeToMaturity: 8, yieldRate: 1000, buyPrice: 40, sellPrice: 48.3, season: "Spring"),
         // Can't buy.
-        new Crop("Carrot", timeToMaturity: 3, yieldRate: 1000, buyPrice: 0, sellPrice: 35, isEnabled: false),
-        new Crop("Green Bean", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 40),
-        new Crop("Strawberry", timeToMaturity: 8, yieldRate: 4, buyPrice: 100, sellPrice: 120),
+        new Crop("Carrot", timeToMaturity: 3, yieldRate: 1000, buyPrice: 0, sellPrice: 35, isEnabled: false, season: "Spring"),
+        new Crop("Green Bean", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 40, season: "Spring"),
+        new Crop("Strawberry", timeToMaturity: 8, yieldRate: 4, buyPrice: 100, sellPrice: 120, season: "Spring"),
         // Spring and summer.
-        new Crop("Coffee Bean", timeToMaturity: 10, yieldRate: 2, buyPrice: 2500, sellPrice: 60),
+        new Crop("Coffee Bean", timeToMaturity: 10, yieldRate: 2, buyPrice: 2500, sellPrice: 60, season: "Spring"),
 
         /* Summer crops */
         // PPI comparison. Based on: 2000g, 100t, profit 29.7k.
         // Best 5000g/100t profit I have is 41k.
-        new Crop("Blueberry", 13, 4, 80, 150, isEnabled: false), // solo 16k
-        new Crop("Hot Pepper", 5, 3, 40, 40, isEnabled: false), // solo 24k
-        new Crop("Melon", 12, 1000, 80, 250, isEnabled: false), // solo 17.5k
-        new Crop("Hops", 11, 1, 60, 25, isEnabled: false), // solo 13k
-        new Crop("Tomato", 11, 4, 50, 60, isEnabled: false), // solo 13.5k
-        new Crop("Radish", 6, 1000, 40, 90, isEnabled: false), // solo 17.5k
-        new Crop("Poppy", 7, 1000, 100, 140, isEnabled: false), // solo 3.5k
-        new Crop("Spangle", 8, 1000, 50, 90, isEnabled: false), // solo 8.5k
-        new Crop("Starfruit", 13, 1000, 400, 750, isEnabled: false), // solo 5k
+        new Crop("Blueberry", 13, 4, 80, 150, isEnabled: false, "Summer"), // solo 16k
+        new Crop("Hot Pepper", 5, 3, 40, 40, isEnabled: false, "Summer"), // solo 24k
+        new Crop("Melon", 12, 1000, 80, 250, isEnabled: false, "Summer"), // solo 17.5k
+        new Crop("Hops", 11, 1, 60, 25, isEnabled: false, "Summer"), // solo 13k
+        new Crop("Tomato", 11, 4, 50, 60, isEnabled: false, "Summer"), // solo 13.5k
+        new Crop("Radish", 6, 1000, 40, 90, isEnabled: false, "Summer"), // solo 17.5k
+        new Crop("Poppy", 7, 1000, 100, 140, isEnabled: false, "Summer"), // solo 3.5k
+        new Crop("Spangle", 8, 1000, 50, 90, isEnabled: false, "Summer"), // solo 8.5k
+        new Crop("Starfruit", 13, 1000, 400, 750, isEnabled: false, "Summer"), // solo 5k
         // Summer and fall
-        new Crop("Wheat", 4, 1000, 10, 25, isEnabled: false), // solo 7.5k
+        new Crop("Wheat", 4, 1000, 10, 25, isEnabled: false, "Summer"), // solo 7.5k
         // Summer and fall
-        new Crop("Corn", 14, 4, 150, 50, isEnabled: false), // solo 650 (in the 2nd month you'd make 4.5k)
+        new Crop("Corn", 14, 4, 150, 50, isEnabled: false, "Summer"), // solo 650 (in the 2nd month you'd make 4.5k)
 
         /* Fall crops */
         // Sunflower is in fall and summer.
         // Also note that the sunflow yields every 8 days and dies, but it has an average 100% change of dropping 1 seed.
         // This makes it like a persistent crop with a 9 day yield rate.
-        new Crop("Sunflower", timeToMaturity: 8, yieldRate: 9, buyPrice: 200, sellPrice: 80, isEnabled: false),
-        new Crop("Artichoke", timeToMaturity: 8, yieldRate: 1000, buyPrice: 30, sellPrice: 160, isEnabled: false),
-        new Crop("Bok Choy", timeToMaturity: 4, yieldRate: 1000, buyPrice: 50, sellPrice: 80, isEnabled: false),
-        new Crop("Fairy Rose", timeToMaturity: 12, yieldRate: 1000, buyPrice: 200, sellPrice: 290, isEnabled: false),
-        new Crop("Pumpkin", timeToMaturity: 13, yieldRate: 1000, buyPrice: 100, sellPrice: 320, isEnabled: false),
-        new Crop("Sweet Gem Berry", timeToMaturity: 24, yieldRate: 1000, buyPrice: 1000, sellPrice: 3000, isEnabled: false),
-        new Crop("Yam", timeToMaturity: 10, yieldRate: 1000, buyPrice: 60, sellPrice: 160, isEnabled: false),
+        new Crop("Sunflower", timeToMaturity: 8, yieldRate: 9, buyPrice: 200, sellPrice: 80, isEnabled: false, "Fall"),
+        new Crop("Artichoke", timeToMaturity: 8, yieldRate: 1000, buyPrice: 30, sellPrice: 160, isEnabled: false, "Fall"),
+        new Crop("Bok Choy", timeToMaturity: 4, yieldRate: 1000, buyPrice: 50, sellPrice: 80, isEnabled: false, "Fall"),
+        new Crop("Fairy Rose", timeToMaturity: 12, yieldRate: 1000, buyPrice: 200, sellPrice: 290, isEnabled: false, "Fall"),
+        new Crop("Pumpkin", timeToMaturity: 13, yieldRate: 1000, buyPrice: 100, sellPrice: 320, isEnabled: false, "Fall"),
+        new Crop("Sweet Gem Berry", timeToMaturity: 24, yieldRate: 1000, buyPrice: 1000, sellPrice: 3000, isEnabled: false, "Fall"),
+        new Crop("Yam", timeToMaturity: 10, yieldRate: 1000, buyPrice: 60, sellPrice: 160, isEnabled: false, "Fall"),
         // Sells for 75g with yield of 2.11.
-        new Crop("Cranberries", timeToMaturity: 7, yieldRate: 5, buyPrice: 240, sellPrice: 158.3, isEnabled: false),
-        new Crop("Eggplant", timeToMaturity: 5, yieldRate: 5, buyPrice: 20, sellPrice: 60, isEnabled: false),
+        new Crop("Cranberries", timeToMaturity: 7, yieldRate: 5, buyPrice: 240, sellPrice: 158.3, isEnabled: false, "Fall"),
+        new Crop("Eggplant", timeToMaturity: 5, yieldRate: 5, buyPrice: 20, sellPrice: 60, isEnabled: false, "Fall"),
         // Can't buy.
-        new Crop("Broccoli", timeToMaturity: 8, yieldRate: 4, buyPrice: 0, sellPrice: 70, isEnabled: false),
-        new Crop("Grape", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 80, isEnabled: false),
-        new Crop("Beet", timeToMaturity: 6, yieldRate: 1000, buyPrice: 20, sellPrice: 100, isEnabled: false),
-        new Crop("Amaranth", timeToMaturity: 7, yieldRate: 1000, buyPrice: 70, sellPrice: 150, isEnabled: false),
+        new Crop("Broccoli", timeToMaturity: 8, yieldRate: 4, buyPrice: 0, sellPrice: 70, isEnabled: false, "Fall"),
+        new Crop("Grape", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 80, isEnabled: false, "Fall"),
+        new Crop("Beet", timeToMaturity: 6, yieldRate: 1000, buyPrice: 20, sellPrice: 100, isEnabled: false, "Fall"),
+        new Crop("Amaranth", timeToMaturity: 7, yieldRate: 1000, buyPrice: 70, sellPrice: 150, isEnabled: false, "Fall"),
 
         /* Winter crops */
         // Can't buy.
-        new Crop("Powdermelon", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 20, isEnabled: false),
+        new Crop("Powdermelon", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 20, isEnabled: false, "Winter"),
         // Can plant in any season. Can't buy.
         // A fiber sells for 5g, and produces 5.5 units on average
-        new Crop("Fiber", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 27.5, isEnabled: false),
+        new Crop("Fiber", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 27.5, isEnabled: false, "Winter"),
     };
 
     private double AvailableGold = 5000;

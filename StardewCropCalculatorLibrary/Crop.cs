@@ -15,6 +15,7 @@ namespace StardewCropCalculatorLibrary
         public double buyPrice { get; set; }
         public double sellPrice { get; set; }
         public bool IsEnabled { get; set; } = true;
+        public string Season { get; set; } // Spring, Summer, Fall, Winter
 
         /// <summary>
         /// Per-tile profitability index starting on a specific day.
@@ -76,7 +77,7 @@ namespace StardewCropCalculatorLibrary
         /// <param name="yieldRate">days between succesive yields after maturity</param>
         /// <param name="buyPrice">price that the seed was bought for</param>
         /// <param name="sellPrice">price that the crop will be sold at</param>
-        public Crop(string name, int timeToMaturity, int yieldRate, double buyPrice, double sellPrice, bool isEnabled = true)
+        public Crop(string name, int timeToMaturity, int yieldRate, double buyPrice, double sellPrice, bool isEnabled = true, string season = null)
         {
             this.name = name;
             this.timeToMaturity = timeToMaturity;
@@ -84,6 +85,7 @@ namespace StardewCropCalculatorLibrary
             this.buyPrice = buyPrice;
             this.sellPrice = sellPrice;
             this.IsEnabled = isEnabled;
+            this.Season = season;
         }
 
         // If something costs $1 and sells for $3, its "multiple of money" is 3.  I.e., your money triples.
