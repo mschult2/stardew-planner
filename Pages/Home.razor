@@ -77,8 +77,9 @@
                     <div class="crop-content">
                         <input type="checkbox" checked="@crop.IsEnabled" @onchange="(e => ToggleCropState(crop, e))" />
                         <span class="@(!crop.IsEnabled ? "disabled-crop" : "")">
-                            @crop.name (Matures: @crop.timeToMaturity days, Cost: @crop.buyPrice g, Sell Price: @crop.sellPrice g
-                            @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $", Yield Rate: {crop.yieldRate} days" : ", Yield Rate: N/A"))
+                            @crop.name (Matures: @crop.timeToMaturity days, @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $"Yield Rate: {crop.yieldRate} days" : "Yield Rate: N/A")
+                            , Cost: @crop.buyPrice g,
+                            Sell Price: @crop.sellPrice g)
                         </span>
                         <button type="button" class="delete-btn" disabled="@(IsBusy)" @onclick="(() => DeleteCrop(crop))">Delete</button>
                     </div>
