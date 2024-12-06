@@ -66,16 +66,29 @@
     <h4>Crops</h4>
     @if (Crops.Any())
     {
-        <input type="checkbox" class="select-all" @onchange="(e => ToggleAllCropsState(e))" />
-        <span>
-            <i>Select All</i>
-        </span>
+        <div class="checkbox-row">
+            <input type="checkbox" class="select-all" @onchange="(e => ToggleAllCrops(e))" />
+            <span><i>All</i></span>
+
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Spring", e))" />
+            <span><i>Spring</i></span>
+
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Summer", e))" />
+            <span><i>Summer</i></span>
+
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Fall", e))" />
+            <span><i>Fall</i></span>
+
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Winter", e))" />
+            <span><i>Winter</i></span>
+        </div>
+
         <ul>
             @foreach (var crop in Crops)
             {
                 <li class="crop-item @crop.Season?.ToLower()">
                     <div class="crop-content">
-                        <input type="checkbox" checked="@crop.IsEnabled" @onchange="(e => ToggleCropState(crop, e))" />
+                        <input type="checkbox" checked="@crop.IsEnabled" @onchange="(e => ToggleCrop(crop, e))" />
                         <span class="@(!crop.IsEnabled ? "disabled-crop" : "")">
                             @crop.name (Matures: @crop.timeToMaturity days, @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $"Yield Rate: {crop.yieldRate} days" : "Yield Rate: N/A")
                             , Cost: @crop.buyPrice g,
@@ -445,6 +458,22 @@
         bottom: 3px; /* Adjust this value to fine-tune alignment */
     }
 
+    .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 10px; /* Space between checkboxes and labels */
+        margin-bottom: 10px;
+    }
+
+    .season-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        vertical-align: middle;
+        margin: 0;
+    }
+
+
     /* Overlay */
     .calendar-overlay {
         position: absolute; /* Position relative to .calendar-container */
@@ -543,8 +572,7 @@
         new Crop("Carrot", timeToMaturity: 3, yieldRate: 1000, buyPrice: 0, sellPrice: 35, isEnabled: false, season: "Spring"),
         new Crop("Green Bean", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 40, season: "Spring"),
         new Crop("Strawberry", timeToMaturity: 8, yieldRate: 4, buyPrice: 100, sellPrice: 120, season: "Spring"),
-        // Spring and summer.
-        new Crop("Coffee Bean", timeToMaturity: 10, yieldRate: 2, buyPrice: 2500, sellPrice: 60, season: "Spring"),
+        new Crop("Coffee Bean", timeToMaturity: 10, yieldRate: 2, buyPrice: 2500, sellPrice: 60, season: "Spring", secondSeason: "Summer"),
 
         /* Summer crops */
         // PPI comparison. Based on: 2000g, 100t, profit 29.7k.
@@ -558,16 +586,13 @@
         new Crop("Poppy", 7, 1000, 100, 140, isEnabled: false, "Summer"), // solo 3.5k
         new Crop("Spangle", 8, 1000, 50, 90, isEnabled: false, "Summer"), // solo 8.5k
         new Crop("Starfruit", 13, 1000, 400, 750, isEnabled: false, "Summer"), // solo 5k
-        // Summer and fall
-        new Crop("Wheat", 4, 1000, 10, 25, isEnabled: false, "Summer"), // solo 7.5k
-        // Summer and fall
-        new Crop("Corn", 14, 4, 150, 50, isEnabled: false, "Summer"), // solo 650 (in the 2nd month you'd make 4.5k)
-
-        /* Fall crops */
-        // Sunflower is in fall and summer.
+        new Crop("Wheat", 4, 1000, 10, 25, isEnabled: false, "Summer", "Fall"), // solo 7.5k
+        new Crop("Corn", 14, 4, 150, 50, isEnabled: false, "Summer", "Fall"), // solo 650 (in the 2nd month you'd make 4.5k)
         // Also note that the sunflow yields every 8 days and dies, but it has an average 100% change of dropping 1 seed.
         // This makes it like a persistent crop with a 9 day yield rate.
-        new Crop("Sunflower", timeToMaturity: 8, yieldRate: 9, buyPrice: 200, sellPrice: 80, isEnabled: false, "Fall"),
+        new Crop("Sunflower", timeToMaturity: 8, yieldRate: 9, buyPrice: 200, sellPrice: 80, isEnabled: false, "Summer", "Fall"),
+
+        /* Fall crops */
         new Crop("Artichoke", timeToMaturity: 8, yieldRate: 1000, buyPrice: 30, sellPrice: 160, isEnabled: false, "Fall"),
         new Crop("Bok Choy", timeToMaturity: 4, yieldRate: 1000, buyPrice: 50, sellPrice: 80, isEnabled: false, "Fall"),
         new Crop("Fairy Rose", timeToMaturity: 12, yieldRate: 1000, buyPrice: 200, sellPrice: 290, isEnabled: false, "Fall"),
@@ -787,6 +812,12 @@
     private double Profit = -1;
     private bool IsBusy;
 
+    private bool allSelected;
+    private bool springSelected;
+    private bool summerSelected;
+    private bool fallSelected;
+    private bool winterSelected;
+
     protected override void OnInitialized()
     {
         ClearSchedule();
@@ -798,16 +829,49 @@
         ClearSchedule();
     }
 
-    private void ToggleCropState(Crop crop, ChangeEventArgs e)
+    private void ToggleCrop(Crop crop, ChangeEventArgs e)
     {
         crop.IsEnabled = (bool)e.Value;
         calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
-    private void ToggleAllCropsState(ChangeEventArgs e)
+    private void ToggleAllCrops(ChangeEventArgs e)
     {
+        allSelected = (bool)e.Value;
+
         foreach (var crop in Crops)
             crop.IsEnabled = (bool)e.Value;
+
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
+    }
+
+    private void ToggleAllCropsSeason(string season, ChangeEventArgs e)
+    {
+        bool isEnabled = (bool)e.Value;
+
+        switch (season)
+        {
+            case "Spring":
+                springSelected = isEnabled;
+                break;
+            case "Summer":
+                summerSelected = isEnabled;
+                break;
+            case "Fall":
+                fallSelected = isEnabled;
+                break;
+            case "Winter":
+                winterSelected = isEnabled;
+                break;
+            default:
+                break;
+        }
+
+        foreach (var crop in Crops)
+        {
+            if (crop.Season == season || crop.SecondSeason == season)
+                crop.IsEnabled = isEnabled;
+        }
 
         calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
