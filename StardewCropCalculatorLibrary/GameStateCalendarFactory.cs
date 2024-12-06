@@ -238,6 +238,7 @@ namespace StardewCropCalculatorLibrary
 
         private Crop cheapestCrop = null;
 
+        // Memory threshold in GB. Necessary because browser tabs only allow WebAssembly apps to use 2 GB of memory. (Javascript is 4 GB)
         private double memoryThreshold = 1.38;
 
         private bool useStrategy1 = false;
@@ -269,7 +270,7 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// Return the optimial schedule.
         /// </summary>
-        public async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCrop(int availableTiles, double availableGold)
+        public async Task<Tuple<double, GameStateCalendar>> GetBestSchedule(int availableTiles, double availableGold)
         {
             answerCache.Clear();
             daysToEvaluate.Clear();
@@ -298,7 +299,7 @@ namespace StardewCropCalculatorLibrary
             if (useStrategy1)
             {
                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
-                wealth = await GetMostProfitableCropIterative();
+                wealth = await GetBestSchedule_Strategy1();
 
                 answerCache.Clear();
                 daysToEvaluate.Clear();
@@ -307,7 +308,7 @@ namespace StardewCropCalculatorLibrary
             }
             else
             {
-                GetMostProfitableCropAlternate(1, calendar);
+                GetBestSchedule_Strategy2(1, calendar);
                 wealth = Tuple.Create(calendar.Wealth, calendar);
             }
 
@@ -328,8 +329,11 @@ namespace StardewCropCalculatorLibrary
 
         /// <summary>
         /// Return the maximum amount of gold you can end the season with, and the schedule that accompanies it.
+        /// 
+        /// Algorithm is a complete state space simulation with various optimizations.
+        /// Very memory and CPU intensive.
         /// </summary>
-        private async Task<Tuple<double, GameStateCalendar>> GetMostProfitableCropIterative()
+        private async Task<Tuple<double, GameStateCalendar>> GetBestSchedule_Strategy1()
         {
             double bestWealth = 0;
             GameStateCalendar bestCalendar = null;
@@ -436,9 +440,14 @@ namespace StardewCropCalculatorLibrary
         }
 
         /// <summary>
-        /// Return the optimal schedule.
+        /// Return an APPROXIMATION of the best schedule and wealth.
+        /// Accurate to within 0-15%.
+        /// 
+        /// Algorithm is a basic mathematical equation or heuristic. It basically checks what the best crop to plant the entire
+        /// field with would be on any given day, given the available tiles and gold.
+        /// Takes very little memory and CPU.
         /// </summary>
-        private void GetMostProfitableCropAlternate(in int startDay, GameStateCalendar calendar)
+        private void GetBestSchedule_Strategy2(in int startDay, GameStateCalendar calendar)
         {
             SortedSet<int> daysOfInterest = new SortedSet<int>() { startDay };
 

@@ -794,7 +794,7 @@
             // Calculate schedule with simulation (slow)
             if (AvailableTiles > 0)
             {
-                var wealthAndCalendar = await calendarFactory.GetMostProfitableCrop(AvailableTiles, AvailableGold);
+                var wealthAndCalendar = await calendarFactory.GetBestSchedule(AvailableTiles, AvailableGold);
 
                 // Copy to UI elements: Profit, ROI
                 var totalWealth = wealthAndCalendar.Item1;
