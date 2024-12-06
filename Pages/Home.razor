@@ -21,6 +21,10 @@
             <input type="number" @bind="AvailableTiles" />
             <span>(0 means unlimited)</span>
         </div>
+        <div class="form-row">
+            <label>Current Day:</label>
+            <input type="number" @bind="CurrentDay" />
+        </div>
     </form>
 </div>
 
@@ -153,7 +157,7 @@
                                     // Determine the class for planting day
                                     string cellClass = plantingDay ? "planting-day" : "";
 
-                                    <td class="@cellClass">
+                                    <td class="@((day < CurrentDay) ? "disabled-day" : "") @cellClass">
                                         <div style="position: relative; height: 100%; width: 100%;">
                                             <!-- Ensure the parent fills the cell -->
                                             @if (HarvestDays[day])
@@ -289,6 +293,15 @@
         .calendar-table .planting-day {
             background-color: #39ff14; /* Neon green */
         }
+
+    .disabled-day {
+        background-color: #f0f0f0; /* Light gray background */
+        color: #a0a0a0; /* Gray text color */
+        text-decoration: line-through; /* Optional: Strike-through text */
+        pointer-events: none; /* Prevent interactions with disabled cells */
+        opacity: 0.5; /* Reduce visual prominence */
+    }
+
 
     /* Style for harvest marker */
     .harvest-marker {
@@ -570,16 +583,16 @@
     //     new Crop("Starfruit", 13, 1000, 400, 750),
     //     new Crop("Blueberry", 13, 4, 80, 150),
     //     new Crop("Hot Pepper", 5, 3, 40, 40),
-     //     new Crop("Melon", 12, 1000, 80, 250),
-     //     new Crop("Hops", 11, 1, 60, 25),
-     //     new Crop("Tomato", 11, 4, 50, 60),
-     // };
-     // private double AvailableGold = 1500;
-     // private int AvailableTiles = 100;
+    //     new Crop("Melon", 12, 1000, 80, 250),
+    //     new Crop("Hops", 11, 1, 60, 25),
+    //     new Crop("Tomato", 11, 4, 50, 60),
+    // };
+    // private double AvailableGold = 1500;
+       // private int AvailableTiles = 100;
 
-     /* Test 6: Stress Test
-     * ERROR: After 7min and 36,000 operations: "Garbage collector could not allocate 65536u bytes of memory for major heap section". (Browser was only using ~2GB) (17,585 cache hits)
-     * Same with cache disabled. Memeory usage 1.75 GB.
+       /* Test 6: Stress Test
+    * ERROR: After 7min and 36,000 operations: "Garbage collector could not allocate 65536u bytes of memory for major heap section". (Browser was only using ~2GB) (17,585 cache hits)
+    * Same with cache disabled. Memeory usage 1.75 GB.
     * Ah it's because a Chrome browser tab limits the WebAssembly heap memory to 2 GB. Javascript gets more, 4 GB!
     * Results according to PPI strat, may not be correct: profit 89k. D1 125 pep, D7 125 pep, D10 125 pep, D13 star.
     */
@@ -595,12 +608,12 @@
     //     new Crop("Spangle", 8, 1000, 50, 90),
     //     new Crop("Starfruit", 13, 1000, 400, 750),
     //     new Crop("Wheat", 4, 1000, 10, 25),
-     //     new Crop("Corn", 14, 4, 150, 50),
-     // };
-     // private double AvailableGold = 5000;
-     // private int AvailableTiles = 400;
+    //     new Crop("Corn", 14, 4, 150, 50),
+       // };
+       // private double AvailableGold = 5000;
+       // private int AvailableTiles = 400;
 
-     /* Test 7: Balanced TG 0.09
+       /* Test 7: Balanced TG 0.09
     * IM results: profit 102k. D1 125 pep, d7 62 blue, d10 263 wheat, d15 174 melon, d16 63 melon.
     * PPI results: profit 93k. D1 125 pep, D7 125 pep, D10 125 pep, D13 75 melon.
     */
@@ -612,11 +625,11 @@
     //     new Crop("Tomato", 11, 4, 50, 60),
     //     new Crop("Hot Pepper", 5, 3, 40, 40),
     //     new Crop("Wheat", 4, 1000, 10, 25),
-     // };
-     // private double AvailableGold = 5000;
-     // private int AvailableTiles = 450;
+       // };
+       // private double AvailableGold = 5000;
+       // private int AvailableTiles = 450;
 
-     /* Test 8: High TG 0.5
+       /* Test 8: High TG 0.5
     * PPI results: 51,000,000g. Schedule: D1 1m wheat, D6 250k wheat, D11 156k pep, D17 156k pep, D20 156k rad, D23 31k wheat
     */
     // private static readonly List<Crop> DefaultCrops = new()
@@ -634,7 +647,7 @@
     //     new Crop("Corn", 14, 4, 150, 50),
     // };
     // private double AvailableGold = 1000000;
-     // private int AvailableTiles = 500000;
+    // private int AvailableTiles = 500000;
 
     /* Test 9: Very High TG 4.0
     */
@@ -655,6 +668,28 @@
     // private double AvailableGold = 100000;
     // private int AvailableTiles = 400000;
 
+    private static readonly int DefaultDay = 1;
+
+    private int _currentDay = DefaultDay;
+    private int CurrentDay
+    {
+        get => _currentDay;
+        set
+        {
+            if (value < 1 || value >= 28)
+            {
+                Console.WriteLine($"Ignoring invalid value for Current Day: {value}");
+                return;
+            }
+
+            if (value != _currentDay)
+            {
+                _currentDay = value;
+                OnCurrentDayChanged();
+            }
+        }
+    }
+
     // Input properties for a new crop
     private string NewCropName = string.Empty;
     private int NewCropTimeToMaturity;
@@ -665,7 +700,7 @@
     // Default crop list
     private List<Crop> Crops = new List<Crop>(DefaultCrops);
 
-    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(NumDays, DefaultCrops);
+    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(NumDays, DefaultCrops, DefaultDay);
 
     private PlantSchedule Schedule = new(NumDays);
     private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
@@ -682,11 +717,16 @@
         ClearSchedule();
     }
 
+    private void OnCurrentDayChanged()
+    {
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
+        ClearSchedule();
+    }
+
     private void ToggleCropState(Crop crop, ChangeEventArgs e)
     {
-        Console.WriteLine($"TOGGLE CROP STATE: {crop.name}");
-        crop.IsEnabled = (bool)e.Value; // Update the crop's IsEnabled property
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
+        crop.IsEnabled = (bool)e.Value;
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
     // Add a new crop to the list
@@ -710,7 +750,7 @@
             NewCropBuyPrice = 0;
             NewCropSellPrice = 0;
 
-            calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
+            calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
         }
     }
 
@@ -718,7 +758,7 @@
     private void DeleteCrop(Crop crop)
     {
         Crops.Remove(crop);
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
     // Delete all crops
@@ -726,7 +766,7 @@
     {
         Crops.Clear();
         ClearSchedule();
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops);
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
     private void ClearSchedule()
@@ -764,17 +804,20 @@
                 InvestmentMultiplier = AvailableGold != 0 ? totalWealth / AvailableGold : -1;
 
                 // Copy to UI elements: Schedule, ScheduleDetails, PlantingDays/HarvestDays
-                if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0 && calendar.GameStates.ContainsKey(1))
+                if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0)
                 {
-                    Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
+                    // Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
                     for (int day = 1; day <= 28; ++day)
                     {
+                        if (!calendar.GameStates.ContainsKey(day))
+                            continue;
+
                         var dayState = calendar.GameStates[day];
 
                         // Currently days-of-interest only represent planting paydays (not harvest days)
                         if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                         {
-                            Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
+                            // Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
 
                             foreach (var batch in dayState.Plants)
                             {
@@ -783,7 +826,7 @@
                                     PlantingDays[day] = true;
 
                                     Schedule.AddCrop(day, batch.CropType);
-                                    Console.WriteLine($"    -> Day {day}: {batch.Count} {batch.CropType.name} PPI: {batch.CropType.CurrentProfitIndex(day)}");
+                                    // Console.WriteLine($"    -> Day {day}: {batch.Count} {batch.CropType.name} PPI: {batch.CropType.CurrentProfitIndex(day, NumDays)}");
 
                                     if (ScheduleDetails[day] == null)
                                         ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
@@ -867,7 +910,7 @@
 
                             // Subtract gold and add plants
                             curGameState.Wallet = curGameState.Wallet - unitsToPlant * crop.buyPrice;
-                            curGameState.Plants.Add(new PlantBatch(crop, unitsToPlant, day));
+                            curGameState.Plants.Add(new PlantBatch(crop, unitsToPlant, day, NumDays));
                         }
                     }
                 }

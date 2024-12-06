@@ -17,42 +17,18 @@ namespace StardewCropCalculatorLibrary
         public bool IsEnabled { get; set; } = true;
 
         /// <summary>
-        /// Per-tile profitability index. How profitable a tile is, if we only plant this crop on it the entire month.
-        ///
-        /// Note: this metric is misleading, because it's only useful if all tiles are filled.
-        /// But if you switch to another crop with a better TPI, that crop might not fill all the tiles at the same rate.
-        /// So it's only useful in situations where available tiles are so low, ANY crop can fill them up almost immediately.
-        /// </summary>
-        public int TPI
-        {
-            get
-            {
-                if (IsPersistent)
-                {
-                    var numHarvests = NumHarvests(1, 28);
-                    return (int)((numHarvests * sellPrice) - buyPrice);
-                }
-                else
-                {
-                    int numHarvests = 28 / (timeToMaturity + 1);
-                    return (int)((numHarvests * sellPrice) - (numHarvests * buyPrice));
-                }
-            }
-        }
-
-        /// <summary>
         /// Per-tile profitability index starting on a specific day.
         /// </summary>
-        public int CurrentProfitIndex(int day)
+        public int CurrentProfitIndex(int day, int numDays)
         {
-            if (IsPersistent)
+            if (IsPersistent(numDays))
             {
-                var numHarvests = NumHarvests(day, 28);
+                var numHarvests = NumHarvests(day, numDays);
                 return (int)((numHarvests * sellPrice) - buyPrice);
             }
             else
             {
-                int numHarvests = (29 - day) / (timeToMaturity + 1);
+                int numHarvests = (numDays + 1 - day) / (timeToMaturity + 1);
                 return (int)((numHarvests * sellPrice) - (numHarvests * buyPrice));
             }
         }
@@ -60,13 +36,13 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// The real profit, in gold, if we plant the entire farm with this crop.
         /// </summary>
-        public double CurrentProfit(int day, int availableTiles, double availableGold, out int numToPlant)
+        public double CurrentProfit(int day, int availableTiles, double availableGold, int numDays, out int numToPlant)
         {
             int unitsCanAfford = ((int)(availableGold / buyPrice));
             bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
             numToPlant = goldLimited ? unitsCanAfford : availableTiles;
 
-            return numToPlant * CurrentProfitIndex(day);
+            return numToPlant * CurrentProfitIndex(day, numDays);
         }
 
         /// <summary>
@@ -124,17 +100,17 @@ namespace StardewCropCalculatorLibrary
             return numHarvests < 0 ? 0 : numHarvests;
         }
 
-        public List<int> HarvestDays(int plantDay)
+        public List<int> HarvestDays(int plantDay, int numDays)
         {
             List<int> harvestDays = new List<int>();
 
             int harvestDate = plantDay + timeToMaturity;
 
-            if (harvestDate <= 28)
+            if (harvestDate <= numDays)
             {
                 harvestDays.Add(harvestDate);
 
-                while (harvestDate + yieldRate <= 28)
+                while (harvestDate + yieldRate <= numDays)
                 {
                     harvestDate += yieldRate;
                     harvestDays.Add(harvestDate);
@@ -144,12 +120,39 @@ namespace StardewCropCalculatorLibrary
             return harvestDays;
         }
 
-        public bool IsPersistent => yieldRate > 0 && yieldRate < 28;
+        public bool IsPersistent(int numDays)
+        {
+            return yieldRate > 0 && yieldRate < numDays;
+        }
 
         public override string ToString()
         {
             return name;
         }
+
+        ///// <summary>
+        ///// Per-tile profitability index. How profitable a tile is, if we only plant this crop on it the entire month.
+        /////
+        ///// Note: this metric is misleading, because it's only useful if all tiles are filled.
+        ///// But if you switch to another crop with a better TPI, that crop might not fill all the tiles at the same rate.
+        ///// So it's only useful in situations where available tiles are so low, ANY crop can fill them up almost immediately.
+        ///// </summary>
+        //public int TPI
+        //{
+        //    get
+        //    {
+        //        if (IsPersistent)
+        //        {
+        //            var numHarvests = NumHarvests(1, numDays);
+        //            return (int)((numHarvests * sellPrice) - buyPrice);
+        //        }
+        //        else
+        //        {
+        //            int numHarvests = numDays / (timeToMaturity + 1);
+        //            return (int)((numHarvests * sellPrice) - (numHarvests * buyPrice));
+        //        }
+        //    }
+        //}
     }
 }
 

@@ -8,10 +8,11 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Security.Claims;
 using System.Data.SqlTypes;
+using System.Collections;
 
 namespace StardewCropCalculatorLibrary
 {
-    /// <summary> The state of our farm on every day. </summary>
+    /// <summary> The state of our farm on every day. Includes the day after the last day of the season, since we still get paid on that day. </summary>
     public class GameStateCalendar
     {
         public readonly int NumDays;
@@ -20,6 +21,11 @@ namespace StardewCropCalculatorLibrary
 
         /// <summary> The state of our farm on a particular day. Ie, how many plants, free tiles, and gold we have. </summary>
         public readonly SortedDictionary<int, GameState> GameStates = new SortedDictionary<int, GameState>();
+
+        private GameStateCalendar(int numDays)
+        {
+            NumDays = numDays;
+        }
 
         public GameStateCalendar(int numDays, int availableTiles, double availableGold)
         {
@@ -72,10 +78,13 @@ namespace StardewCropCalculatorLibrary
         /// Values outside the indicated range are left untouched.
         /// </summary>
         /// <param name="otherCalendar">The calendar to copy</param>
-        /// <param name="startingDay">The day to copy from.</param>
-        /// <param name="endingDay">The day to end copying on.</param>
-        public void Merge(GameStateCalendar otherCalendar, int startingDay = 1, int endingDay = 29)
+        /// <param name="startingDay">The day to copy from. Default is 1.</param>
+        /// <param name="endingDay">The day to end copying on. Default is day after the last day of the season.</param>
+        public void Merge(GameStateCalendar otherCalendar, int startingDay = 1, int endingDay = 0)
         {
+            if (endingDay == 0)
+                endingDay = NumDays + 1;
+
             for (int i = startingDay; i <= endingDay; ++i)
             {
                 GameStates[i].Wallet = otherCalendar.GameStates[i].Wallet;
@@ -87,6 +96,31 @@ namespace StardewCropCalculatorLibrary
                 foreach (PlantBatch otherPlantBatch in otherCalendar.GameStates[i].Plants)
                     GameStates[i].Plants.Add(new PlantBatch(otherPlantBatch));
             }
+        }
+
+        /// <summary>
+        /// Return a new schedule shifted forward by a few days (shallow copy). Example: instead of starting at day 1, it starts at day 15.
+        /// </summary>
+        /// <param name="calendar">The calendar to use a shifted version of.</param>
+        /// <param name="daysToShift">Number of days to shift the schedule forward.</param>
+        static public GameStateCalendar Shift(GameStateCalendar calendar, int daysToShift)
+        {
+            GameStateCalendar newCalendar = new GameStateCalendar(calendar.NumDays);
+
+            foreach (var gameStatePair in calendar.GameStates)
+            {
+                var oldState = gameStatePair.Value;
+
+                var newState = newCalendar.GameStates[gameStatePair.Key + daysToShift] = oldState;
+
+                for (int i = 0; i < oldState.Plants.Count; ++i)
+                {
+                    PlantBatch oldBatch = newState.Plants[i];
+                    newState.Plants[i] = new PlantBatch(oldBatch.CropType, oldBatch.Count, oldBatch.PlantDay + daysToShift, oldBatch.NumDays + daysToShift);
+                }
+            }
+
+            return newCalendar;
         }
     }
 
@@ -124,17 +158,19 @@ namespace StardewCropCalculatorLibrary
         public Crop CropType = null;
         public int Count = 0;
         public readonly SortedSet<int> HarvestDays = new SortedSet<int>();
-        public bool Persistent => IsPersistent(CropType);
+        public bool Persistent => CropType.IsPersistent(NumDays);
+        public int NumDays { get; }
 
         public int PlantDay;
 
-        public PlantBatch(Crop cropType, int cropCount, int plantDay)
+        public PlantBatch(Crop cropType, int cropCount, int plantDay, int numDays)
         {
+            NumDays = numDays;
             CropType = cropType;
             Count = cropCount;
             PlantDay = plantDay;
 
-            foreach (var harvestDay in cropType.HarvestDays(plantDay))
+            foreach (var harvestDay in cropType.HarvestDays(plantDay, numDays))
                 HarvestDays.Add(harvestDay);
         }
 
@@ -146,12 +182,6 @@ namespace StardewCropCalculatorLibrary
 
             foreach (int otherHarvestDay in otherPlantBatch.HarvestDays)
                 HarvestDays.Add(otherHarvestDay);
-        }
-
-        private static bool IsPersistent(Crop crop)
-        {
-            // TODO: input numDays
-            return crop.yieldRate > 0 && crop.yieldRate < 28;
         }
 
         public override string ToString()
@@ -194,6 +224,8 @@ namespace StardewCropCalculatorLibrary
 
         private int NumDays;
 
+        private int StartDay;
+
         private readonly List<Crop> Crops = new List<Crop>();
 
         private Queue<GetMostProfitableCropArgs> daysToEvaluate = new Queue<GetMostProfitableCropArgs>(3000);
@@ -210,9 +242,19 @@ namespace StardewCropCalculatorLibrary
 
         private bool useStrategy1 = false;
 
-        public GameStateCalendarFactory(int numDays, List<Crop> crops)
+        /// <summary>
+        /// Configure the scheduler.
+        /// </summary>
+        /// <param name="startingDay">Which day to start on - can be anywhere from 1 - 27.</param>
+        /// <param name="numDays">Number of days in the season, always 28.</param>
+        /// <param name="crops"></param>
+        public GameStateCalendarFactory(int numDays, List<Crop> crops, int startDay)
         {
-            NumDays = numDays;
+            if (startDay < 1 || startDay >= numDays)
+                throw new Exception($"Starting day was invalid: {startDay}");
+
+            StartDay = startDay;
+            NumDays = numDays - startDay + 1;
             Crops = crops.Where(c => c.IsEnabled).ToList();
 
             // Find cheapest crop
@@ -256,7 +298,6 @@ namespace StardewCropCalculatorLibrary
             if (useStrategy1)
             {
                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
-
                 wealth = await GetMostProfitableCropIterative();
 
                 answerCache.Clear();
@@ -267,15 +308,19 @@ namespace StardewCropCalculatorLibrary
             else
             {
                 GetMostProfitableCropAlternate(1, calendar);
-
                 wealth = Tuple.Create(calendar.Wealth, calendar);
             }
 
             if (infiniteGold)
             {
                 double newProfit = wealth.Item1 - availableGold;
-
                 wealth = Tuple.Create(newProfit, wealth.Item2);
+            }
+
+            if (StartDay > 1)
+            {
+                var shiftedCalendar = GameStateCalendar.Shift(wealth.Item2, StartDay - 1);
+                wealth = Tuple.Create(wealth.Item1, shiftedCalendar);
             }
 
             return wealth;
@@ -348,7 +393,7 @@ namespace StardewCropCalculatorLibrary
                     if (unitsToPlant > 0)
                     {
                         // Update game state based on the current purchase.
-                        UpdateCalendar(thisCropCalendar, unitsToPlant, crop, day);
+                        UpdateCalendar(thisCropCalendar, unitsToPlant, crop, day, numDays);
 
                         // Queue up updating game state based on subsequent purchases.
                         for (int j = day + 1; j <= numDays; ++j)
@@ -372,7 +417,7 @@ namespace StardewCropCalculatorLibrary
                     // If no further action can be taken for all crops, then a schedule has been completed!
                     if (thisCropScheduleCompleted)
                     {
-                        double thisCropWealth = thisCropCalendar?.GameStates[29].Wallet ?? 0;
+                        double thisCropWealth = thisCropCalendar?.GameStates[NumDays + 1].Wallet ?? 0;
 
                         if (thisCropWealth > bestWealth)
                         {
@@ -412,7 +457,7 @@ namespace StardewCropCalculatorLibrary
 
                 foreach (var crop in Crops)
                 {
-                    double curProfitMetric = crop.CurrentProfit(day, curGameState.FreeTiles, curGameState.Wallet, out int numToPlant);
+                    double curProfitMetric = crop.CurrentProfit(day, curGameState.FreeTiles, curGameState.Wallet, NumDays, out int numToPlant);
 
                     if (curProfitMetric > bestProfitMetric)
                     {
@@ -425,15 +470,13 @@ namespace StardewCropCalculatorLibrary
                 // Add best crop's paydays
                 if (bestCrop != null)
                 {
-                    UpdateCalendar(calendar, bestNumToPlant, bestCrop, day);
+                    UpdateCalendar(calendar, bestNumToPlant, bestCrop, day, NumDays);
 
-                    foreach (int harvestDay in bestCrop.HarvestDays(day))
+                    foreach (int harvestDay in bestCrop.HarvestDays(day, NumDays))
                     {
                         if (harvestDay <= NumDays)
                             daysOfInterest.Add(harvestDay + 1);
                     }
-
-                    //Console.WriteLine($"Day {day}: Plant {bestNumToPlant} {bestCrop}. availableTiles: {curGameState.FreeTiles}, availableGold: {curGameState.Wallet}");
                 }
                 // If no profitable crop is left, then we're done
                 else
@@ -442,12 +485,10 @@ namespace StardewCropCalculatorLibrary
                 }
             }
 
-            //Console.WriteLine($"Summary Day {NumDays + 1}: availableTiles: {calendar.GameStates[NumDays + 1].FreeTiles}, availableGold: {calendar.GameStates[NumDays + 1].Wallet}");
-
             return;
         }
 
-        private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int day)
+        private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int day, int numDays)
         {
             if (unitsToPlant <= 0)
                 return;
@@ -463,7 +504,7 @@ namespace StardewCropCalculatorLibrary
                 calendar.GameStates[day].FreeTiles = calendar.GameStates[day].FreeTiles - unitsToPlant;
             calendar.GameStates[day].DayOfInterest = true;
 
-            PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day);
+            PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day, numDays);
             var harvestDays = plantBatch.HarvestDays;
             calendar.GameStates[day].Plants.Add(plantBatch);
 
@@ -483,7 +524,7 @@ namespace StardewCropCalculatorLibrary
 
                     if (curUnits > 0)
                     {
-                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
+                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
 
                         if (availableTiles != -1)
                             calendar.GameStates[j + 1].FreeTiles = calendar.GameStates[j + 1].FreeTiles - curUnits;
@@ -505,7 +546,7 @@ namespace StardewCropCalculatorLibrary
                         if (availableTiles != -1)
                             calendar.GameStates[j + 1].FreeTiles = calendar.GameStates[j + 1].FreeTiles - curUnits;
 
-                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day));
+                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
                     }
 
                     // Modify gold
@@ -545,26 +586,6 @@ namespace StardewCropCalculatorLibrary
             }
 
             return serializedGameStateSb.ToString();
-        }
-
-        private static List<int> GetHarvestDays(int plantDay, Crop crop)
-        {
-            List<int> harvestDays = new List<int>();
-
-            int harvestDate = plantDay + crop.timeToMaturity;
-
-            if (harvestDate <= 28)
-                harvestDays.Add(harvestDate);
-            else
-                return harvestDays;
-
-            while (harvestDate + crop.yieldRate <= 28)
-            {
-                harvestDate += crop.yieldRate;
-                harvestDays.Add(harvestDate);
-            }
-
-            return harvestDays;
         }
 
         private bool CanPlantInFuture(int currentDay, GameStateCalendar calendar)
