@@ -498,22 +498,39 @@
         }
     }
 
-    /* Starting crops are Summer crops. */
     private static readonly List<Crop> DefaultCrops = new()
     {
+        /* Spring crops */
+        new Crop("Blue Jazz", timeToMaturity: 7, yieldRate: 1000, buyPrice: 30, sellPrice: 50),
+        new Crop("Cauliflower", timeToMaturity: 12, yieldRate: 1000, buyPrice: 80, sellPrice: 175),
+        new Crop("Garlic", timeToMaturity: 4, yieldRate: 1000, buyPrice: 40, sellPrice: 60),
+        new Crop("Kale", timeToMaturity: 6, yieldRate: 1000, buyPrice: 70, sellPrice: 110),
+        new Crop("Parsnip", timeToMaturity: 4, yieldRate: 1000, buyPrice: 20, sellPrice: 35),
+        // Potato base sell price 80g, but yields 1.25 units on average
+        new Crop("Potato", timeToMaturity: 6, yieldRate: 1000, buyPrice: 50, sellPrice: 100),
+        new Crop("Rhubarb", timeToMaturity: 13, yieldRate: 1000, buyPrice: 100, sellPrice: 220),
+        new Crop("Tulip", timeToMaturity: 6, yieldRate: 1000, buyPrice: 20, sellPrice: 30),
+        // Rice base sell price 30g, but yields 1.61 on average (until max Farming level 10)
+        new Crop("Unmilled Rice", timeToMaturity: 8, yieldRate: 1000, buyPrice: 40, sellPrice: 48.3),
+        // new Crop("Carrot", timeToMaturity: 3, yieldRate: 1000, buyPrice: 1, sellPrice: 35),
+        new Crop("Green Bean", timeToMaturity: 10, yieldRate: 3, buyPrice: 60, sellPrice: 40),
+        new Crop("Strawberry", timeToMaturity: 8, yieldRate: 4, buyPrice: 100, sellPrice: 120),
+        new Crop("Coffee Bean", timeToMaturity: 10, yieldRate: 2, buyPrice: 2500, sellPrice: 60),
+
+        /* Summer crops */
         // PPI comparison. Based on: 2000g, 100t, profit 29.7k.
         // Best 5000g/100t profit I have is 41k.
-        new Crop("Blueberry", 13, 4, 80, 150), // solo 16k
-        new Crop("Hot Pepper", 5, 3, 40, 40), // solo 24k
-        new Crop("Melon", 12, 1000, 80, 250), // solo 17.5k
-        new Crop("Hops", 11, 1, 60, 25), // solo 13k
-        new Crop("Tomato", 11, 4, 50, 60), // solo 13.5k
-        new Crop("Radish", 6, 1000, 40, 90), // solo 17.5k
-        new Crop("Poppy", 7, 1000, 100, 140), // solo 3.5k
-        new Crop("Spangle", 8, 1000, 50, 90), // solo 8.5k
-        new Crop("Starfruit", 13, 1000, 400, 750), // solo 5k
-        new Crop("Wheat", 4, 1000, 10, 25), // solo 7.5k
-        new Crop("Corn", 14, 4, 150, 50), // solo 650 (in the 2nd month you'd make 4.5k)
+        new Crop("Blueberry", 13, 4, 80, 150, isEnabled: false), // solo 16k
+        new Crop("Hot Pepper", 5, 3, 40, 40, isEnabled: false), // solo 24k
+        new Crop("Melon", 12, 1000, 80, 250, isEnabled: false), // solo 17.5k
+        new Crop("Hops", 11, 1, 60, 25, isEnabled: false), // solo 13k
+        new Crop("Tomato", 11, 4, 50, 60, isEnabled: false), // solo 13.5k
+        new Crop("Radish", 6, 1000, 40, 90, isEnabled: false), // solo 17.5k
+        new Crop("Poppy", 7, 1000, 100, 140, isEnabled: false), // solo 3.5k
+        new Crop("Spangle", 8, 1000, 50, 90, isEnabled: false), // solo 8.5k
+        new Crop("Starfruit", 13, 1000, 400, 750, isEnabled: false), // solo 5k
+        new Crop("Wheat", 4, 1000, 10, 25, isEnabled: false), // solo 7.5k
+        new Crop("Corn", 14, 4, 150, 50, isEnabled: false), // solo 650 (in the 2nd month you'd make 4.5k)
     };
 
     private double AvailableGold = 5000;
