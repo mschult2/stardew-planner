@@ -878,11 +878,15 @@
     {
         foreach (var crop in Crops)
         {
-            crop.IsEnabled = allSelected
-            || (springSelected && (crop.Season == SpringName || crop.SecondSeason == SpringName))
-            || (summerSelected && (crop.Season == SummerName || crop.SecondSeason == SummerName))
-            || (fallSelected   && (crop.Season == FallName   || crop.SecondSeason == FallName))
-            || (winterSelected && (crop.Season == WinterName || crop.SecondSeason == WinterName));
+            // Make a couple exceptions for crops which can't be purchased and so aren't particularly relevant
+            if (crop.name != "Carrot" && crop.name != "Broccoli")
+            {
+                crop.IsEnabled = allSelected
+                || (springSelected && (crop.Season == SpringName || crop.SecondSeason == SpringName))
+                || (summerSelected && (crop.Season == SummerName || crop.SecondSeason == SummerName))
+                || (fallSelected && (crop.Season == FallName || crop.SecondSeason == FallName))
+                || (winterSelected && (crop.Season == WinterName || crop.SecondSeason == WinterName));
+            }
         }
 
         calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
