@@ -67,19 +67,19 @@
     @if (Crops.Any())
     {
         <div class="checkbox-row">
-            <input type="checkbox" class="select-all" @onchange="(e => ToggleAllCrops(e))" />
+            <input type="checkbox" class="select-all-checkbox" @onchange="(e => ToggleAllCrops(e))" />
             <span><i>All</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Spring", e))" />
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Spring", e))" />
             <span><i>Spring</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Summer", e))" />
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Summer", e))" />
             <span><i>Summer</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Fall", e))" />
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Fall", e))" />
             <span><i>Fall</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleAllCropsSeason("Winter", e))" />
+            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Winter", e))" />
             <span><i>Winter</i></span>
         </div>
 
@@ -448,21 +448,20 @@
         opacity: 0.6; /* Make it look disabled */
     }
 
-    .select-all {
-        width: 18px; /* Compact size */
-        height: 18px; /* Compact size */
-        cursor: pointer; /* Pointer cursor */
-        vertical-align: middle;
-        margin: 0; /* Ensure no extra spacing affects alignment */
-        position: relative; /* Enables fine-tuning alignment */
-        bottom: 3px; /* Adjust this value to fine-tune alignment */
-    }
-
     .checkbox-row {
         display: flex;
         align-items: center;
         gap: 10px; /* Space between checkboxes and labels */
         margin-bottom: 10px;
+    }
+
+    .select-all-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        vertical-align: middle;
+        margin: 0;
+        margin-left: 32px;
     }
 
     .season-checkbox {
@@ -471,6 +470,7 @@
         cursor: pointer;
         vertical-align: middle;
         margin: 0;
+        margin-left: 40px;
     }
 
 
@@ -688,9 +688,9 @@
     //     new Crop("Tomato", 11, 4, 50, 60),
     // };
     // private double AvailableGold = 1500;
-       // private int AvailableTiles = 100;
+    // private int AvailableTiles = 100;
 
-       /* Test 6: Stress Test
+    /* Test 6: Stress Test
     * ERROR: After 7min and 36,000 operations: "Garbage collector could not allocate 65536u bytes of memory for major heap section". (Browser was only using ~2GB) (17,585 cache hits)
     * Same with cache disabled. Memeory usage 1.75 GB.
     * Ah it's because a Chrome browser tab limits the WebAssembly heap memory to 2 GB. Javascript gets more, 4 GB!
@@ -709,11 +709,11 @@
     //     new Crop("Starfruit", 13, 1000, 400, 750),
     //     new Crop("Wheat", 4, 1000, 10, 25),
     //     new Crop("Corn", 14, 4, 150, 50),
-       // };
-       // private double AvailableGold = 5000;
-       // private int AvailableTiles = 400;
+    // };
+    // private double AvailableGold = 5000;
+    // private int AvailableTiles = 400;
 
-       /* Test 7: Balanced TG 0.09
+    /* Test 7: Balanced TG 0.09
     * IM results: profit 102k. D1 125 pep, d7 62 blue, d10 263 wheat, d15 174 melon, d16 63 melon.
     * PPI results: profit 93k. D1 125 pep, D7 125 pep, D10 125 pep, D13 75 melon.
     */
@@ -725,11 +725,11 @@
     //     new Crop("Tomato", 11, 4, 50, 60),
     //     new Crop("Hot Pepper", 5, 3, 40, 40),
     //     new Crop("Wheat", 4, 1000, 10, 25),
-       // };
-       // private double AvailableGold = 5000;
-       // private int AvailableTiles = 450;
+    // };
+    // private double AvailableGold = 5000;
+    // private int AvailableTiles = 450;
 
-       /* Test 8: High TG 0.5
+    /* Test 8: High TG 0.5
     * PPI results: 51,000,000g. Schedule: D1 1m wheat, D6 250k wheat, D11 156k pep, D17 156k pep, D20 156k rad, D23 31k wheat
     */
     // private static readonly List<Crop> DefaultCrops = new()
@@ -767,6 +767,11 @@
     // };
     // private double AvailableGold = 100000;
     // private int AvailableTiles = 400000;
+
+    private static readonly string SpringName = "Spring";
+    private static readonly string SummerName = "Summer";
+    private static readonly string FallName = "Fall";
+    private static readonly string WinterName = "Winter";
 
     private static readonly int DefaultDay = 1;
 
@@ -837,15 +842,14 @@
 
     private void ToggleAllCrops(ChangeEventArgs e)
     {
-        allSelected = (bool)e.Value;
+        bool isEnabled = (bool)e.Value;
 
-        foreach (var crop in Crops)
-            crop.IsEnabled = (bool)e.Value;
+        allSelected = isEnabled;
 
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
+        UpdateCropEnabledState();
     }
 
-    private void ToggleAllCropsSeason(string season, ChangeEventArgs e)
+    private void ToggleSeasonalCrops(string season, ChangeEventArgs e)
     {
         bool isEnabled = (bool)e.Value;
 
@@ -867,10 +871,18 @@
                 break;
         }
 
+        UpdateCropEnabledState();
+    }
+
+    private void UpdateCropEnabledState()
+    {
         foreach (var crop in Crops)
         {
-            if (crop.Season == season || crop.SecondSeason == season)
-                crop.IsEnabled = isEnabled;
+            crop.IsEnabled = allSelected
+            || (springSelected && (crop.Season == SpringName || crop.SecondSeason == SpringName))
+            || (summerSelected && (crop.Season == SummerName || crop.SecondSeason == SummerName))
+            || (fallSelected   && (crop.Season == FallName   || crop.SecondSeason == FallName))
+            || (winterSelected && (crop.Season == WinterName || crop.SecondSeason == WinterName));
         }
 
         calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
