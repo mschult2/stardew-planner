@@ -58,6 +58,8 @@ namespace StardewCropCalculatorLibrary
         /// <returns></returns>
         public double GetBestSchedule(List<Crop> crops, out PlantSchedule schedule)
         {
+            crops = crops.Where(c => c.IsEnabled).ToList();
+
             // Find the best crop for each day, starting from end of season.
             for (int day = numDays; day > 0; --day)
             {
