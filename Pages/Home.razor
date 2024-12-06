@@ -806,8 +806,7 @@
                 // Copy to UI elements: Schedule, ScheduleDetails, PlantingDays/HarvestDays
                 if (Profit > 0 && calendar != null && calendar.GameStates != null && calendar.GameStates.Count > 0)
                 {
-                    // Console.WriteLine($"\n[NewStrategy] Best profit: {Profit}g");
-                    for (int day = 1; day <= 28; ++day)
+                    for (int day = 1; day <= NumDays; ++day)
                     {
                         if (!calendar.GameStates.ContainsKey(day))
                             continue;
@@ -817,8 +816,6 @@
                         // Currently days-of-interest only represent planting paydays (not harvest days)
                         if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                         {
-                            // Console.WriteLine($"[NewStrategy] Day {day}: {dayState}");
-
                             foreach (var batch in dayState.Plants)
                             {
                                 if (batch.PlantDay == day && batch.Count > 0)
@@ -826,7 +823,6 @@
                                     PlantingDays[day] = true;
 
                                     Schedule.AddCrop(day, batch.CropType);
-                                    // Console.WriteLine($"    -> Day {day}: {batch.Count} {batch.CropType.name} PPI: {batch.CropType.CurrentProfitIndex(day, NumDays)}");
 
                                     if (ScheduleDetails[day] == null)
                                         ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() };
