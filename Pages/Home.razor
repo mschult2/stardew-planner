@@ -219,7 +219,7 @@
                     {
                         <div class="calendar-overlay">
                             <div class="spinner"></div>
-                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 30 seconds</p>
+                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 20 seconds</p>
                         </div>
                     }
                 </div>
@@ -1010,6 +1010,7 @@
                         // Currently days-of-interest only represent planting paydays (not harvest days)
                         if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                         {
+                            // Console.WriteLine($"Day {day}: {dayState}");
                             foreach (var batch in dayState.Plants)
                             {
                                 if (batch.PlantDay == day && batch.Count > 0)

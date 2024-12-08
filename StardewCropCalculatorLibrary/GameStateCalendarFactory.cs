@@ -201,12 +201,14 @@ namespace StardewCropCalculatorLibrary
             public int Day;
             public double GoldLowerLimit;
             public GameStateCalendar Calendar;
+            public List<Crop> Crops;
 
-            public GetMostProfitableCropArgs(int day, double goldLowerLimit, GameStateCalendar calendar)
+            public GetMostProfitableCropArgs(int day, double goldLowerLimit, List<Crop> crops, GameStateCalendar calendar)
             {
                 Day = day;
                 GoldLowerLimit = goldLowerLimit;
                 Calendar = calendar;
+                Crops = crops;
             }
         }
 
@@ -241,7 +243,7 @@ namespace StardewCropCalculatorLibrary
         // Memory threshold in GB. Necessary because browser tabs only allow WebAssembly apps to use 2 GB of memory. (Javascript is 4 GB)
         private double memoryThreshold = 1.38;
 
-        private bool useStrategy1 = false;
+        private bool useStrategy1 = true;
 
         private int paydayDelay = 1;
 
@@ -291,30 +293,15 @@ namespace StardewCropCalculatorLibrary
                 infiniteGold = true;
             }
 
-
             startingGold = availableGold;
             startingTiles = availableTiles;
-
-            
-
             Tuple<double, GameStateCalendar> wealth = Tuple.Create<double, GameStateCalendar>(0.0, null);
 
-            if (useStrategy1)
+            // PPI STRATEGY (use for heuristic)
+            var localCrops = new List<Crop>(Crops);
+            var bestCrops = new HashSet<Crop>();
+
             {
-                var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
-
-                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
-
-                wealth = await GetBestSchedule_Strategy1();
-
-                answerCache.Clear();
-                daysToEvaluate.Clear();
-                numOperationsStat = 0;
-                numCacheHitsStat = 0;
-            }
-            else
-            {
-                var localCrops = new List<Crop>(Crops);
                 var numIterations = Crops.Count;
 
                 for (int i = 0; i < numIterations; ++i)
@@ -331,23 +318,46 @@ namespace StardewCropCalculatorLibrary
                     {
                         var topCrop = dayOnePlants[0].CropType;
                         localCrops.Remove(topCrop);
+
+                        // TODO: is it better to take all crops in this schedule?
+                        if (bestCrops.Count < 4)
+                            bestCrops.Add(topCrop);
                     }
                     else
                         break;
                 }
             }
 
+            // GAME STATE SIMULATION
+            if (useStrategy1)
+            {
+                var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
+
+                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, bestCrops.ToList(), calendar));
+
+                wealth = await GetBestSchedule_Strategy1();
+
+            }
+
+            // Modify answer to be profit instead of wealth
             if (infiniteGold)
             {
                 double newProfit = wealth.Item1 - availableGold;
                 wealth = Tuple.Create(newProfit, wealth.Item2);
             }
 
+            // Modify answer to start on appropriate day
             if (StartDay > 1)
             {
                 var shiftedCalendar = GameStateCalendar.Shift(wealth.Item2, StartDay - 1);
                 wealth = Tuple.Create(wealth.Item1, shiftedCalendar);
             }
+
+            // Clean up
+            answerCache.Clear();
+            daysToEvaluate.Clear();
+            numOperationsStat = 0;
+            numCacheHitsStat = 0;
 
             return wealth;
         }
@@ -388,6 +398,7 @@ namespace StardewCropCalculatorLibrary
                 var day = args.Day;
                 var goldLowerLimit = args.GoldLowerLimit;
                 GameStateCalendar todaysCalendar = args.Calendar;
+                var crops = args.Crops;
 
                 int numDays = todaysCalendar.NumDays;
                 int availableTiles = todaysCalendar.GameStates[day].FreeTiles;
@@ -403,7 +414,7 @@ namespace StardewCropCalculatorLibrary
 
                 ++numOperationsStat;
 
-                foreach (var crop in Crops)
+                foreach (var crop in crops)
                 {
                     bool thisCropScheduleCompleted = true;
 
@@ -435,7 +446,7 @@ namespace StardewCropCalculatorLibrary
                                 && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0) && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > startingTiles * TileInvestmentThresold))
                             {
                                 thisCropScheduleCompleted = false;
-                                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, 0, thisCropCalendar));
+                                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, 0, crops, thisCropCalendar));
                                 break;
                             }
                         }
