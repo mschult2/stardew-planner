@@ -289,16 +289,20 @@ namespace StardewCropCalculatorLibrary
                 infiniteGold = true;
             }
 
-            var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
             startingGold = availableGold;
             startingTiles = availableTiles;
 
-            Tuple<double, GameStateCalendar> wealth;
+            
+
+            Tuple<double, GameStateCalendar> wealth = Tuple.Create<double, GameStateCalendar>(0.0, null);
 
             if (useStrategy1)
             {
+                var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
+
                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, calendar));
+
                 wealth = await GetBestSchedule_Strategy1();
 
                 answerCache.Clear();
@@ -308,8 +312,27 @@ namespace StardewCropCalculatorLibrary
             }
             else
             {
-                GetBestSchedule_Strategy2(1, calendar);
-                wealth = Tuple.Create(calendar.Wealth, calendar);
+                var localCrops = new List<Crop>(Crops);
+                var numIterations = Crops.Count;
+
+                for (int i = 0; i < numIterations; ++i)
+                {
+                    GameStateCalendar calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
+
+                    GetBestSchedule_Strategy2(1, localCrops, calendar);
+
+                    if (calendar.Wealth > wealth.Item1)
+                        wealth = Tuple.Create(calendar.Wealth, calendar);
+
+                    var dayOnePlants = calendar.GameStates[1].Plants;
+                    if (dayOnePlants != null && dayOnePlants.Count > 0 && dayOnePlants[0] != null && dayOnePlants[0].Count > 0 && localCrops.Count > 0 && localCrops.Contains(dayOnePlants[0].CropType))
+                    {
+                        var topCrop = dayOnePlants[0].CropType;
+                        localCrops.Remove(topCrop);
+                    }
+                    else
+                        break;
+                }
             }
 
             if (infiniteGold)
@@ -447,7 +470,7 @@ namespace StardewCropCalculatorLibrary
         /// field with would be on any given day, given the available tiles and gold.
         /// Takes very little memory and CPU.
         /// </summary>
-        private void GetBestSchedule_Strategy2(in int startDay, GameStateCalendar calendar)
+        private void GetBestSchedule_Strategy2(in int startDay, List<Crop> crops, GameStateCalendar calendar)
         {
             SortedSet<int> daysOfInterest = new SortedSet<int>() { startDay };
 
@@ -464,7 +487,7 @@ namespace StardewCropCalculatorLibrary
                 Crop bestCrop = null;
                 int bestNumToPlant = 0;
 
-                foreach (var crop in Crops)
+                foreach (var crop in crops)
                 {
                     double curProfitMetric = crop.CurrentProfit(day, curGameState.FreeTiles, curGameState.Wallet, NumDays, out int numToPlant);
 
