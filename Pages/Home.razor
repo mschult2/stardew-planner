@@ -561,6 +561,9 @@
 
     private static readonly List<Crop> DefaultCrops = new()
     {
+        /* Special crops */
+        new Crop("Ancient Fruit", timeToMaturity: 6, yieldRate: 7, buyPrice: 0, sellPrice: 550, isEnabled: false),
+
         /* Spring crops */
         new Crop("Blue Jazz", timeToMaturity: 7, yieldRate: 1000, buyPrice: 30, sellPrice: 50, season: "Spring"),
         new Crop("Cauliflower", timeToMaturity: 12, yieldRate: 1000, buyPrice: 80, sellPrice: 175, season: "Spring"),
@@ -619,9 +622,6 @@
         // Can plant in any season. Can't buy.
         // A fiber sells for 5g, and produces 5.5 units on average
         new Crop("Fiber", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 27.5, isEnabled: false, "Winter"),
-
-        /* Special crops */
-        new Crop("Ancient Fruit", timeToMaturity: 6, yieldRate: 7, buyPrice: 0, sellPrice: 550, isEnabled: false),
     };
 
     private double AvailableGold = 5000;
@@ -880,7 +880,7 @@
 
         allSelected = isEnabled;
 
-        UpdateCropEnabledState();
+        UpdateCropEnabledState(true);
     }
 
     private void ToggleSeasonalCrops(string season, ChangeEventArgs e)
@@ -908,18 +908,28 @@
         UpdateCropEnabledState();
     }
 
-    private void UpdateCropEnabledState()
+    private void UpdateCropEnabledState(bool toggledAll = false)
     {
         foreach (var crop in Crops)
         {
             // Make a couple exceptions for crops which can't be purchased and so aren't particularly relevant
             if (crop.name != "Carrot" && crop.name != "Broccoli")
             {
-                crop.IsEnabled = allSelected
-                || (springSelected && (crop.Season == SpringName || crop.SecondSeason == SpringName))
-                || (summerSelected && (crop.Season == SummerName || crop.SecondSeason == SummerName))
-                || (fallSelected && (crop.Season == FallName || crop.SecondSeason == FallName))
-                || (winterSelected && (crop.Season == WinterName || crop.SecondSeason == WinterName));
+                // Special non-seasonal crops, may be user-added
+                if (string.IsNullOrEmpty(crop.Season) && string.IsNullOrEmpty(crop.SecondSeason))
+                {
+                    if (toggledAll)
+                        crop.IsEnabled = allSelected;
+                }
+                // Seasonal crops
+                else
+                {
+                    crop.IsEnabled = allSelected
+                                    || (springSelected && (crop.Season == SpringName || crop.SecondSeason == SpringName))
+                                    || (summerSelected && (crop.Season == SummerName || crop.SecondSeason == SummerName))
+                                    || (fallSelected && (crop.Season == FallName || crop.SecondSeason == FallName))
+                                    || (winterSelected && (crop.Season == WinterName || crop.SecondSeason == WinterName));
+                }
             }
         }
 
