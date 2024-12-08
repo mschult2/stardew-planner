@@ -619,6 +619,9 @@
         // Can plant in any season. Can't buy.
         // A fiber sells for 5g, and produces 5.5 units on average
         new Crop("Fiber", timeToMaturity: 7, yieldRate: 1000, buyPrice: 0, sellPrice: 27.5, isEnabled: false, "Winter"),
+
+        /* Special crops */
+        new Crop("Ancient Fruit", timeToMaturity: 6, yieldRate: 7, buyPrice: 0, sellPrice: 550, isEnabled: false),
     };
 
     private double AvailableGold = 5000;

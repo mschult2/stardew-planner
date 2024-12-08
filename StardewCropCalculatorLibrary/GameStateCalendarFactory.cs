@@ -422,7 +422,7 @@ namespace StardewCropCalculatorLibrary
                     GameStateCalendar thisCropCalendar = new GameStateCalendar(todaysCalendar, startingDay: day, endingDay: numDays + 1);
 
                     // Calculate number of units to plant.
-                    int unitsCanAfford = ((int)(availableGold / crop.buyPrice));
+                    int unitsCanAfford = crop.buyPrice != 0 ? ((int)(availableGold / crop.buyPrice)) : int.MaxValue;
                     bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
                     int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
 
