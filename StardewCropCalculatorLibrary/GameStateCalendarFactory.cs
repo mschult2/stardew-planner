@@ -243,6 +243,8 @@ namespace StardewCropCalculatorLibrary
 
         private bool useStrategy1 = false;
 
+        private int paydayDelay = 1;
+
         /// <summary>
         /// Configure the scheduler.
         /// </summary>
@@ -507,7 +509,7 @@ namespace StardewCropCalculatorLibrary
                     foreach (int harvestDay in bestCrop.HarvestDays(day, NumDays))
                     {
                         if (harvestDay <= NumDays)
-                            daysOfInterest.Add(harvestDay + 1);
+                            daysOfInterest.Add(harvestDay + paydayDelay);
                     }
                 }
                 // If no profitable crop is left, then we're done
@@ -520,7 +522,7 @@ namespace StardewCropCalculatorLibrary
             return;
         }
 
-        private static void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int day, int numDays)
+        private void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int day, int numDays)
         {
             if (unitsToPlant <= 0)
                 return;
@@ -544,7 +546,7 @@ namespace StardewCropCalculatorLibrary
             int curUnits = unitsToPlant;
 
             // Update game state calendar based on today's crop purchase.
-            for (int j = day; j <= calendar.NumDays; ++j)
+            for (int j = day; j <= calendar.NumDays + 1 - paydayDelay; ++j)
             {
                 if (plantBatch.HarvestDays.Contains(j))
                 {
@@ -556,17 +558,17 @@ namespace StardewCropCalculatorLibrary
 
                     if (curUnits > 0)
                     {
-                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
+                        calendar.GameStates[j + paydayDelay].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
 
                         if (availableTiles != -1)
-                            calendar.GameStates[j + 1].FreeTiles = calendar.GameStates[j + 1].FreeTiles - curUnits;
+                            calendar.GameStates[j + paydayDelay].FreeTiles = calendar.GameStates[j + paydayDelay].FreeTiles - curUnits;
                     }
 
                     // Modify gold
                     cumulativeSale += sale;
 
-                    calendar.GameStates[j + 1].Wallet = calendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
-                    calendar.GameStates[j + 1].DayOfInterest = true;
+                    calendar.GameStates[j + paydayDelay].Wallet = calendar.GameStates[j + paydayDelay].Wallet + cumulativeSale - cost;
+                    calendar.GameStates[j + paydayDelay].DayOfInterest = true;
                 }
                 else
                 {
@@ -576,13 +578,13 @@ namespace StardewCropCalculatorLibrary
                     if (curUnits > 0)
                     {
                         if (availableTiles != -1)
-                            calendar.GameStates[j + 1].FreeTiles = calendar.GameStates[j + 1].FreeTiles - curUnits;
+                            calendar.GameStates[j + paydayDelay].FreeTiles = calendar.GameStates[j + paydayDelay].FreeTiles - curUnits;
 
-                        calendar.GameStates[j + 1].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
+                        calendar.GameStates[j + paydayDelay].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
                     }
 
                     // Modify gold
-                    calendar.GameStates[j + 1].Wallet = calendar.GameStates[j + 1].Wallet + cumulativeSale - cost;
+                    calendar.GameStates[j + paydayDelay].Wallet = calendar.GameStates[j + paydayDelay].Wallet + cumulativeSale - cost;
                 }
             }
         }
@@ -620,34 +622,6 @@ namespace StardewCropCalculatorLibrary
             return serializedGameStateSb.ToString();
         }
 
-        private bool CanPlantInFuture(int currentDay, GameStateCalendar calendar)
-        {
-            int numDays = calendar.NumDays;
-
-            for (int day = currentDay + 1; day <= numDays; ++day)
-            {
-                double availableGold = calendar.GameStates[day].Wallet;
-                int availableTiles = calendar.GameStates[day].FreeTiles;
-
-                if (availableGold > 0 && (availableTiles > 0 || availableTiles == -1))
-                {
-                    // Check if any crop can be planted on this day
-                    foreach (var crop in Crops)
-                    {
-                        if (day + crop.timeToMaturity <= numDays)
-                        {
-                            int unitsCanAfford = (int)(availableGold / crop.buyPrice);
-
-                            if (unitsCanAfford > 0)
-                                return true; // Planting is possible in the future
-                        }
-                    }
-                }
-            }
-
-            return false; // No planting actions possible in future days
-        }
-
         private bool CheckMemoryLimit()
         {
             long memoryInBytes = GC.GetTotalMemory(false);
@@ -661,5 +635,33 @@ namespace StardewCropCalculatorLibrary
             else
                 return false;
         }
+
+        //private bool CanPlantInFuture(int currentDay, GameStateCalendar calendar)
+        //{
+        //    int numDays = calendar.NumDays;
+
+        //    for (int day = currentDay + 1; day <= numDays; ++day)
+        //    {
+        //        double availableGold = calendar.GameStates[day].Wallet;
+        //        int availableTiles = calendar.GameStates[day].FreeTiles;
+
+        //        if (availableGold > 0 && (availableTiles > 0 || availableTiles == -1))
+        //        {
+        //            // Check if any crop can be planted on this day
+        //            foreach (var crop in Crops)
+        //            {
+        //                if (day + crop.timeToMaturity <= numDays)
+        //                {
+        //                    int unitsCanAfford = (int)(availableGold / crop.buyPrice);
+
+        //                    if (unitsCanAfford > 0)
+        //                        return true; // Planting is possible in the future
+        //                }
+        //            }
+        //        }
+        //    }
+
+        //    return false; // No planting actions possible in future days
+        //}
     }
 }

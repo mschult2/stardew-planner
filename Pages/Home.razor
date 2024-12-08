@@ -5,7 +5,7 @@
 <h3>Stardew Valley Planting Schedule Generator</h3>
 
 <div>
-    This website computes the most profitable crop to plant on each day. Just enter the crops you have available to you and press "Generate Calendar".
+    This website computes the most profitable crop to plant on each day. Just enter the crops available to you and press "Generate Schedule".
 </div>
 <br />
 
@@ -74,7 +74,7 @@
             <input type="checkbox" class="select-all-checkbox" @onchange="(e => ToggleAllCrops(e))" />
             <span><i>All</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Spring", e))" />
+            <input type="checkbox" class="season-checkbox" checked @onchange="@(e => ToggleSeasonalCrops("Spring", e))" />
             <span><i>Spring</i></span>
 
             <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Summer", e))" />
