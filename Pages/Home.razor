@@ -25,6 +25,10 @@
             <label>Current Day:</label>
             <input type="number" @bind="CurrentDay" />
         </div>
+        <div class="form-row">
+            <label>Season Length:</label>
+            <input type="number" @bind="NumDays" />
+        </div>
     </form>
 </div>
 
@@ -162,10 +166,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @for (int week = 0; week < 4; week++) // 4 weeks
+                        @for (int week = 0; week < Math.Ceiling(NumDays / 7.0); ++week) // 4 weeks
                         {
+                            int MaxDayOfWeek = Math.Min(NumDays - (week * 7), 7);
                             <tr>
-                                @for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) // 7 days in a week
+                                @for (int dayOfWeek = 1; dayOfWeek <= MaxDayOfWeek; ++dayOfWeek) // 7 days in a week
                                 {
                                     int day = week * 7 + dayOfWeek;
                                     var crops = Schedule.GetCrops(day);
@@ -774,6 +779,7 @@
     private static readonly string WinterName = "Winter";
 
     private static readonly int DefaultDay = 1;
+    private static readonly int DefaultNumDays = 28;
 
     private int _currentDay = DefaultDay;
     private int CurrentDay
@@ -795,6 +801,26 @@
         }
     }
 
+    private int _numDays = DefaultNumDays;
+    private int NumDays
+    {
+        get => _numDays;
+        set
+        {
+            if (value < 2)
+            {
+                Console.WriteLine($"Ignoring invalid value for Num Days: {value}");
+                return;
+            }
+
+            if (value != _numDays)
+            {
+                _numDays = value;
+                OnNumDaysChanged();
+            }
+        }
+    }
+
     // Input properties for a new crop
     private string NewCropName = string.Empty;
     private int NewCropTimeToMaturity;
@@ -805,14 +831,13 @@
     // Default crop list
     private List<Crop> Crops = new List<Crop>(DefaultCrops);
 
-    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(NumDays, DefaultCrops, DefaultDay);
+    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(DefaultNumDays, DefaultCrops, DefaultDay);
 
-    private PlantSchedule Schedule = new(NumDays);
-    private DayDetails[] ScheduleDetails = new DayDetails[NumDays + 1];
+    private PlantSchedule Schedule = new(DefaultNumDays);
+    private DayDetails[] ScheduleDetails = new DayDetails[DefaultNumDays + 1];
 
-    private const int NumDays = 28; // Stardew Valley season length
-    private bool[] PlantingDays = new bool[NumDays + 1];
-    private bool[] HarvestDays = new bool[NumDays + 1];
+    private bool[] PlantingDays = new bool[DefaultNumDays + 1];
+    private bool[] HarvestDays = new bool[DefaultNumDays + 1];
     private double InvestmentMultiplier = -1;
     private double Profit = -1;
     private bool IsBusy;
@@ -829,6 +854,12 @@
     }
 
     private void OnCurrentDayChanged()
+    {
+        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
+        ClearSchedule();
+    }
+
+    private void OnNumDaysChanged()
     {
         calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
         ClearSchedule();

@@ -246,8 +246,8 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// Configure the scheduler.
         /// </summary>
-        /// <param name="startingDay">Which day to start on - can be anywhere from 1 - 27.</param>
-        /// <param name="numDays">Number of days in the season, always 28.</param>
+        /// <param name="startingDay">Which day to start on - can be anywhere from 1 - numDays.</param>
+        /// <param name="numDays">Number of days in the season.</param>
         /// <param name="crops"></param>
         public GameStateCalendarFactory(int numDays, List<Crop> crops, int startDay)
         {

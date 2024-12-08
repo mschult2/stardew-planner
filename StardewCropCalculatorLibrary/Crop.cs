@@ -153,8 +153,8 @@ namespace StardewCropCalculatorLibrary
 
         public bool IsPersistent(int numDays)
         {
-            // YieldRate=1000 is a hacky way that the webpage specifies a crop as non-persistent, thus the check again a fairly big number like 28.
-            return yieldRate > 0 && yieldRate < 28;
+            // YieldRate=1000 is a hacky way that the webpage specifies a crop as non-persistent, thus the check again a fairly big number.
+            return yieldRate > 0 && yieldRate < 30;
         }
 
         public override string ToString()
