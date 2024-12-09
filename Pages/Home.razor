@@ -2,40 +2,19 @@
 <PageTitle>Stardew Crop Planner</PageTitle>
 @using StardewCropCalculatorLibrary
 
-<h3>Stardew Valley Planting Schedule Generator</h3>
+<h2>Stardew Valley Planting Schedule Generator</h2>
 
 <div>
-    This website computes the most profitable crop to plant on each day. Just enter the crops available to you and press "Generate Schedule".
+    This website computes the most profitable planting schedule using a Monte Carlo game state simulation. Just enter how much gold and field tiles you have, then press "Generate Schedule".
 </div>
-<br />
-
 <div>
-    <form class="aligned-form">
-        <div class="form-row">
-            <label>Available Gold:</label>
-            <input type="number" @bind="AvailableGold" />
-            <span>(0 means unlimited)</span>
-        </div>
-        <div class="form-row">
-            <label>Available Field Tiles:</label>
-            <input type="number" @bind="AvailableTiles" />
-            <span>(0 means unlimited)</span>
-        </div>
-        <div class="form-row">
-            <label>Current Day:</label>
-            <input type="number" @bind="CurrentDay" />
-        </div>
-        <div class="form-row">
-            <label>Season Length:</label>
-            <input type="number" @bind="NumDays" />
-        </div>
-    </form>
+    Note that it doesn't yet support crop quality and crafting. It also assumes that you sell your harvest to a store and plant a new batch on the same day. This can be changed in Settings.
 </div>
 
 <br />
 
 <div>
-    <h4>Add Crop</h4>
+    <h3>Add Crop</h3>
     <form class="aligned-form">
         <div class="form-row">
             <label>Crop Name:</label>
@@ -67,7 +46,7 @@
 <br />
 
 <div>
-    <h4>Crops</h4>
+    <h3>Crops</h3>
     @if (Crops.Any())
     {
         <div class="checkbox-row">
@@ -114,7 +93,33 @@
 <br />
 
 <div>
-    <h4>Planting Schedule</h4>
+    <h3>Settings</h3>
+    <form class="aligned-form">
+        <div class="form-row">
+            <label>Available Gold:</label>
+            <input type="number" @bind="AvailableGold" />
+            <span>(0 means unlimited)</span>
+        </div>
+        <div class="form-row">
+            <label>Available Field Tiles:</label>
+            <input type="number" @bind="AvailableTiles" />
+            <span>(0 means unlimited)</span>
+        </div>
+        <div class="form-row">
+            <label>Current Day:</label>
+            <input type="number" @bind="CurrentDay" />
+        </div>
+        <div class="form-row">
+            <label>Season Length:</label>
+            <input type="number" @bind="NumDays" />
+        </div>
+    </form>
+</div>
+
+<br />
+
+<div>
+ @*    <h4>Planting Schedule</h4> *@
 
     <!-- Generate Schedule button -->
     <button disabled="@(IsBusy)" @onclick="GenerateCalendar" class="big-button">Generate Schedule!</button>
