@@ -5,10 +5,10 @@
 <h2>Stardew Valley Planting Schedule Generator</h2>
 
 <div>
-    This website computes the most profitable planting schedule using a Monte Carlo game state simulation. Just enter how much gold and field tiles you have, then press "Generate Schedule".
+    This website computes the most profitable planting schedule using a Monte Carlo simulation. Just enter how much gold and field tiles you have, then press "Generate Schedule".
 </div>
 <div>
-    Note that it doesn't yet support crop quality and crafting. It also assumes that you sell your harvest to a store and plant a new batch on the same day. This can be changed in Settings.
+    Note that it doesn't yet support crop quality and crafting. It also assumes that you sell a batch of crops at the store the same day you harvest it, then plant the next batch. This can be changed in Settings.
 </div>
 
 <br />
@@ -50,19 +50,19 @@
     @if (Crops.Any())
     {
         <div class="checkbox-row">
-            <input type="checkbox" class="select-all-checkbox" @onchange="(e => ToggleAllCrops(e))" />
+            <input type="checkbox" class="select-all-checkbox" @bind="AllSelected" />
             <span><i>All</i></span>
 
-            <input type="checkbox" class="season-checkbox" checked @onchange="@(e => ToggleSeasonalCrops("Spring", e))" />
+            <input type="checkbox" class="season-checkbox" @bind="SpringSelected" />
             <span><i>Spring</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Summer", e))" />
+            <input type="checkbox" class="season-checkbox" @bind="SummerSelected" />
             <span><i>Summer</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Fall", e))" />
+            <input type="checkbox" class="season-checkbox" @bind="FallSelected" />
             <span><i>Fall</i></span>
 
-            <input type="checkbox" class="season-checkbox" @onchange="@(e => ToggleSeasonalCrops("Winter", e))" />
+            <input type="checkbox" class="season-checkbox" @bind="WinterSelected" />
             <span><i>Winter</i></span>
         </div>
 
@@ -82,6 +82,24 @@
                 </li>
             }
         </ul>
+
+        <div class="checkbox-row">
+            <input type="checkbox" class="select-all-checkbox" @bind="AllSelected" />
+            <span><i>All</i></span>
+
+            <input type="checkbox" class="season-checkbox" @bind="SpringSelected" />
+            <span><i>Spring</i></span>
+
+            <input type="checkbox" class="season-checkbox" @bind="SummerSelected" />
+            <span><i>Summer</i></span>
+
+            <input type="checkbox" class="season-checkbox" @bind="FallSelected" />
+            <span><i>Fall</i></span>
+
+            <input type="checkbox" class="season-checkbox" @bind="WinterSelected" />
+            <span><i>Winter</i></span>
+        </div>
+
         <button type="button" disabled="@(IsBusy)" @onclick="DeleteAllCrops" class="delete-all-btn">Delete All</button>
     }
     else
@@ -112,6 +130,13 @@
         <div class="form-row">
             <label>Season Length:</label>
             <input type="number" @bind="NumDays" />
+        </div>
+        <div class="payday-options">
+            <label>Harvest Payday:</label>
+            <input type="radio" style="margin-left: 40px;" checked="@(SameDay == true)" @onchange="@(() => UpdateSameDay(true))" />
+            Same Day
+            <input type="radio" style="margin-left: 40px;" checked="@(SameDay == false)" @onchange="@(() => UpdateSameDay(false))" />
+            Day After
         </div>
     </form>
 </div>
@@ -789,6 +814,8 @@
     private static readonly int DefaultDay = 1;
     private static readonly int DefaultNumDays = 28;
 
+    private bool SameDay = true;
+
     private int _currentDay = DefaultDay;
     private int CurrentDay
     {
@@ -829,6 +856,82 @@
         }
     }
 
+    private bool _allSelected = false;
+    private bool AllSelected
+    {
+        get => _allSelected;
+        set
+        {
+
+            if (value != _allSelected)
+            {
+                _allSelected = value;
+                UpdateCropEnabledState(true);
+            }
+        }
+    }
+
+    private bool _springSelected = true;
+    private bool SpringSelected
+    {
+        get => _springSelected;
+        set
+        {
+
+            if (value != _springSelected)
+            {
+                _springSelected = value;
+                UpdateCropEnabledState();
+            }
+        }
+    }
+
+    private bool _summerSelected = false;
+    private bool SummerSelected
+    {
+        get => _summerSelected;
+        set
+        {
+
+            if (value != _summerSelected)
+            {
+                _summerSelected = value;
+                UpdateCropEnabledState();
+            }
+        }
+    }
+
+    private bool _fallSelected = false;
+    private bool FallSelected
+    {
+        get => _fallSelected;
+        set
+        {
+
+            if (value != _fallSelected)
+            {
+                _fallSelected = value;
+                UpdateCropEnabledState();
+            }
+        }
+    }
+
+    private bool _winterSelected = false;
+    private bool WinterSelected
+    {
+        get => _winterSelected;
+        set
+        {
+
+            if (value != _winterSelected)
+            {
+                _winterSelected = value;
+                UpdateCropEnabledState();
+            }
+        }
+    }
+
+
     // Input properties for a new crop
     private string NewCropName = string.Empty;
     private int NewCropTimeToMaturity;
@@ -850,15 +953,15 @@
     private double Profit = -1;
     private bool IsBusy;
 
-    private bool allSelected;
-    private bool springSelected;
-    private bool summerSelected;
-    private bool fallSelected;
-    private bool winterSelected;
-
     protected override void OnInitialized()
     {
         ClearSchedule();
+    }
+
+    private void UpdateSameDay(bool sameDayEnabled)
+    {
+        SameDay = sameDayEnabled;
+        GameStateCalendarFactory.PaydayDelay = SameDay ? 0 : 1;
     }
 
     private void OnCurrentDayChanged()
@@ -879,61 +982,27 @@
         calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
-    private void ToggleAllCrops(ChangeEventArgs e)
-    {
-        bool isEnabled = (bool)e.Value;
-
-        allSelected = isEnabled;
-
-        UpdateCropEnabledState(true);
-    }
-
-    private void ToggleSeasonalCrops(string season, ChangeEventArgs e)
-    {
-        bool isEnabled = (bool)e.Value;
-
-        switch (season)
-        {
-            case "Spring":
-                springSelected = isEnabled;
-                break;
-            case "Summer":
-                summerSelected = isEnabled;
-                break;
-            case "Fall":
-                fallSelected = isEnabled;
-                break;
-            case "Winter":
-                winterSelected = isEnabled;
-                break;
-            default:
-                break;
-        }
-
-        UpdateCropEnabledState();
-    }
-
     private void UpdateCropEnabledState(bool toggledAll = false)
     {
         foreach (var crop in Crops)
         {
             // Make a couple exceptions for crops which can't be purchased and so aren't particularly relevant
-            if (crop.name != "Carrot" && crop.name != "Broccoli")
+            if (crop.name != "Carrot" && crop.name != "Broccoli" && crop.name != "Ancient Fruit")
             {
                 // Special non-seasonal crops, may be user-added
                 if (string.IsNullOrEmpty(crop.Season) && string.IsNullOrEmpty(crop.SecondSeason))
                 {
                     if (toggledAll)
-                        crop.IsEnabled = allSelected;
+                        crop.IsEnabled = AllSelected;
                 }
                 // Seasonal crops
                 else
                 {
-                    crop.IsEnabled = allSelected
-                                    || (springSelected && (crop.Season == SpringName || crop.SecondSeason == SpringName))
-                                    || (summerSelected && (crop.Season == SummerName || crop.SecondSeason == SummerName))
-                                    || (fallSelected && (crop.Season == FallName || crop.SecondSeason == FallName))
-                                    || (winterSelected && (crop.Season == WinterName || crop.SecondSeason == WinterName));
+                    crop.IsEnabled = AllSelected
+                                    || (SpringSelected && (crop.Season == SpringName || crop.SecondSeason == SpringName))
+                                    || (SummerSelected && (crop.Season == SummerName || crop.SecondSeason == SummerName))
+                                    || (FallSelected && (crop.Season == FallName || crop.SecondSeason == FallName))
+                                    || (WinterSelected && (crop.Season == WinterName || crop.SecondSeason == WinterName));
                 }
             }
         }

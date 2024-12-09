@@ -245,7 +245,10 @@ namespace StardewCropCalculatorLibrary
 
         private bool useStrategy1 = true;
 
-        private int paydayDelay = 1;
+        /// <summary>
+        /// The time between the day on which we harvest and the day on which we get gold.
+        /// </summary>
+        public static int PaydayDelay { get; set; } = 0;
 
         /// <summary>
         /// Configure the scheduler.
@@ -336,7 +339,6 @@ namespace StardewCropCalculatorLibrary
                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, bestCrops.ToList(), calendar));
 
                 wealth = await GetBestSchedule_Strategy1();
-
             }
 
             // Modify answer to be profit instead of wealth
@@ -440,7 +442,6 @@ namespace StardewCropCalculatorLibrary
                         {
                             // Be careful with increasing the threshold. In a past implementation, it counter-intuitively increased the state space from 2000 to 6000. In another implementation, it made the results incorrect.
                             //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(thisCropCalendar.GameStates[j]), goldLowerLimit);
-
                             //if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
                             if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && thisCropCalendar.GameStates[j].Wallet >= startingGold * GoldInvestmentThreshold
                                 && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0) && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > startingTiles * TileInvestmentThresold))
@@ -520,7 +521,7 @@ namespace StardewCropCalculatorLibrary
                     foreach (int harvestDay in bestCrop.HarvestDays(day, NumDays))
                     {
                         if (harvestDay <= NumDays)
-                            daysOfInterest.Add(harvestDay + paydayDelay);
+                            daysOfInterest.Add(harvestDay + PaydayDelay);
                     }
                 }
                 // If no profitable crop is left, then we're done
@@ -543,23 +544,18 @@ namespace StardewCropCalculatorLibrary
             // Modify current day state.
             double cost = unitsToPlant * crop.buyPrice;
             double sale = unitsToPlant * crop.sellPrice;
-
-            calendar.GameStates[day].Wallet = calendar.GameStates[day].Wallet - cost;
-            if (availableTiles != -1)
-                calendar.GameStates[day].FreeTiles = calendar.GameStates[day].FreeTiles - unitsToPlant;
-            calendar.GameStates[day].DayOfInterest = true;
-
             PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day, numDays);
             var harvestDays = plantBatch.HarvestDays;
-            calendar.GameStates[day].Plants.Add(plantBatch);
 
             double cumulativeSale = 0;
             int curUnits = unitsToPlant;
 
+            calendar.GameStates[day].DayOfInterest = true;
+
             // Update game state calendar based on today's crop purchase.
-            for (int j = day; j <= calendar.NumDays + 1 - paydayDelay; ++j)
+            for (int j = day; j <= calendar.NumDays + 1; ++j)
             {
-                if (plantBatch.HarvestDays.Contains(j))
+                if (plantBatch.HarvestDays.Contains(j - PaydayDelay))
                 {
                     // Payday:
 
@@ -569,17 +565,17 @@ namespace StardewCropCalculatorLibrary
 
                     if (curUnits > 0)
                     {
-                        calendar.GameStates[j + paydayDelay].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
+                        calendar.GameStates[j].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
 
                         if (availableTiles != -1)
-                            calendar.GameStates[j + paydayDelay].FreeTiles = calendar.GameStates[j + paydayDelay].FreeTiles - curUnits;
+                            calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;
                     }
 
                     // Modify gold
                     cumulativeSale += sale;
 
-                    calendar.GameStates[j + paydayDelay].Wallet = calendar.GameStates[j + paydayDelay].Wallet + cumulativeSale - cost;
-                    calendar.GameStates[j + paydayDelay].DayOfInterest = true;
+                    calendar.GameStates[j].Wallet = calendar.GameStates[j].Wallet + cumulativeSale - cost;
+                    calendar.GameStates[j].DayOfInterest = true;
                 }
                 else
                 {
@@ -589,13 +585,13 @@ namespace StardewCropCalculatorLibrary
                     if (curUnits > 0)
                     {
                         if (availableTiles != -1)
-                            calendar.GameStates[j + paydayDelay].FreeTiles = calendar.GameStates[j + paydayDelay].FreeTiles - curUnits;
+                            calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;
 
-                        calendar.GameStates[j + paydayDelay].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
+                        calendar.GameStates[j].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
                     }
 
                     // Modify gold
-                    calendar.GameStates[j + paydayDelay].Wallet = calendar.GameStates[j + paydayDelay].Wallet + cumulativeSale - cost;
+                    calendar.GameStates[j].Wallet = calendar.GameStates[j].Wallet + cumulativeSale - cost;
                 }
             }
         }
