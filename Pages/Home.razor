@@ -8,10 +8,10 @@
     This website computes the most profitable planting schedule using a Monte Carlo simulation. Just type in your available gold, field tiles, add some crops if they're not already there, then press "Generate Schedule".
 </div>
 <div>
-    It's geared towards Stardew Valley, but should work on any game with a similar farming mechanic. Song of Seasons, Harvest Moon, Rune Factory, Fields of Mistria, etc.
+    It's geared towards Stardew Valley, but should work on any game with a similar farming mechanic. Song of Seasons, Harvest Moon, Rune Factory, Fields of Mistria, etc. Just change the "Season Length", press "Delete All", and add new crops.
 </div>
 <div>
-    Note that it doesn't yet support crop quality and crafting. It also assumes that you sell a batch of crops at the store the same day you harvest it, then plant the next batch. This Payday setting can be changed below.
+    Note that it doesn't support crop quality or crafting (yet). It also assumes that you sell a batch of crops at the store the same day you harvest it, then plant the next batch. However, this Payday setting can be changed below.
 </div>
 
 <br />
@@ -30,16 +30,17 @@
         <div class="form-row">
             <label>Days Between Harvests:</label>
             <input type="number" @bind="NewCropYieldRate" />
-            <span>(leave 0 for single harvest)</span>
+            <span>(Leave 0 for plants that die after one harvest)</span>
         </div>
         <div class="form-row">
-            <label>Buy Price:</label>
+            <label>Seed Cost:</label>
             <input type="number" @bind="NewCropBuyPrice" />
+            <span>(The cost of a single seed)</span>
         </div>
         <div class="form-row">
             <label>Total Sell Price:</label>
             <input type="number" @bind="NewCropSellPrice" />
-            <span>(account for multiple fruits/veggies in one harvest. example: blueberries are 50g x 3 = 150g)</span>
+            <span>(Account for plants that produce multiple fruits in one harvest. Example: blueberries are 50g x 3 = 150g)</span>
         </div>
     </form>
     <br />
