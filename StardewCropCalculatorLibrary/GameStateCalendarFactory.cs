@@ -214,15 +214,15 @@ namespace StardewCropCalculatorLibrary
 
         // GameState cache
         private readonly Dictionary<string, Tuple<double, GameStateCalendar>> answerCache = new Dictionary<string, Tuple<double, GameStateCalendar>>();
-
         // Gold pruning: if gold is quite low we ignore it, to simplify the schedule. Expressed as fraction of starting gold. 0 means we process any amount of gold, and 1 means we ignore an amount equal to the starting gold.
         private static readonly double GoldInvestmentThreshold = 0.5;
         private static readonly double TileInvestmentThresold = 0.07;
-
         // Used to bucket cache results.
-        private static readonly int SignificantDigits = 1;
-
+        private static readonly int SignificantDigits = 2;
+        // Optimization: cache completed (best?) schedules.
         private static readonly bool UseCache = true;
+        // Optimization: max number of crops to include in one schedule.
+        private static readonly int MaxNumCropTypes = 4;
 
         private int NumDays;
 
@@ -322,9 +322,19 @@ namespace StardewCropCalculatorLibrary
                         var topCrop = dayOnePlants[0].CropType;
                         localCrops.Remove(topCrop);
 
-                        // TODO: is it better to take all crops in this schedule?
-                        if (bestCrops.Count < 4)
+                        // Heuristic A: take top crop
+                        if (bestCrops.Count < MaxNumCropTypes)
                             bestCrops.Add(topCrop);
+
+                        //// Heuristic B: take all crops
+                        //if (bestCrops.Count < MaxNumCropTypes)
+                        //{
+                        //    int numCropTypesLeft = MaxNumCropTypes - bestCrops.Count;
+                        //    int length = Math.Min(numCropTypesLeft, dayOnePlants.Count);
+
+                        //    for (int plantIndex = 0; plantIndex < length; ++plantIndex)
+                        //        bestCrops.Add(dayOnePlants[plantIndex].CropType);
+                        //}
                     }
                     else
                         break;
@@ -354,6 +364,8 @@ namespace StardewCropCalculatorLibrary
                 var shiftedCalendar = GameStateCalendar.Shift(wealth.Item2, StartDay - 1);
                 wealth = Tuple.Create(wealth.Item1, shiftedCalendar);
             }
+
+            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
 
             // Clean up
             answerCache.Clear();
