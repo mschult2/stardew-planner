@@ -37,12 +37,15 @@ namespace StardewCropCalculatorLibrary
 
         private int StartDay;
 
-        public PlantScheduleFactory(int numDays, int startDay)
-        {
-            if (numDays < 1 || startDay >= numDays) AppUtils.Fail("PlantScheduleFactory(numDays) - numDays must be greater than 0");
+        private int PaydayDelay;
 
-            StartDay = startDay;
-            this.numDays = numDays - startDay + 1;
+        public PlantScheduleFactory(int _numDays, int _startDay, int _paydayDelay)
+        {
+            if (_numDays < 1 || _startDay >= _numDays) AppUtils.Fail("PlantScheduleFactory(numDays) - numDays must be greater than 0");
+
+            PaydayDelay = _paydayDelay;
+            StartDay = _startDay;
+            numDays = _numDays - _startDay + 1;
 
             // Initialize memo table
             memo.schedule = new PlantSchedule(numDays);
@@ -80,7 +83,7 @@ namespace StardewCropCalculatorLibrary
                     var harvestDay = day + crop.timeToMaturity;
                     for (int harvest = 1; harvest <= numHarvests; ++harvest)
                     {
-                        var nextPlantDay = harvestDay + 1; // Money comes in the day after a harvest
+                        var nextPlantDay = harvestDay + PaydayDelay; // Money comes in the day after a harvest
                         var nextPlantDayCumMultiple = nextPlantDay > numDays ? 1 : memo.cumMultiple[nextPlantDay];
 
                         cumInvestmentMultiple += (cropMultiple / numHarvests) * nextPlantDayCumMultiple;
@@ -117,13 +120,15 @@ namespace StardewCropCalculatorLibrary
             return investmentMultiple;
         }
 
+        /// <summary>
         /// This method tells you the actual days to plant on for the last schedule computed. Based on when you get money from harvests.
         /// Returns an array of size numDays - true means you are scheduled to plant on that day.
-        /// NOTE: this is a nonessential detail, since you can just buy the best crop of the day whenever you have money. 
+        /// </summary>
+        /// <param name="sameDayPayday">True if you get paid and replant on harvest day, false if you wait until the following day to replant your profit.</param>
+        /// <param name="plantingDays">Days on which to plant a new plant batch.</param>
+        /// <param name="harvestDays">Days on which a plant batch is harvested.</param>
         public void GetPlantingDays(out bool[] plantingDays, out bool[] harvestDays)
         {
-            int curNumDay = numDays + StartDay - 1;
-
             plantingDays = new bool[numDays + 1];
             harvestDays = new bool[numDays + 1];
             bool[] profitDays = new bool[numDays + 1];
@@ -156,8 +161,8 @@ namespace StardewCropCalculatorLibrary
                     {
                         harvestDays[harvestDay] = true;
 
-                        if (harvestDay < numDays)
-                            profitDays[harvestDay + 1] = true;
+                        if (harvestDay + PaydayDelay <= numDays)
+                            profitDays[harvestDay + PaydayDelay] = true;
                     }
                 }
 
