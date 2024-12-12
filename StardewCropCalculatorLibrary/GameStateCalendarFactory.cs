@@ -249,8 +249,8 @@ namespace StardewCropCalculatorLibrary
         private static readonly int SignificantDigits = 2;
         // Optimization: cache completed (best?) schedules.
         private static readonly bool UseCache = true;
-        // Optimization: max number of crops to include in schedule.
-        private static readonly int MaxNumCropTypes = 5;
+        // Optimization: max number of crops to include in schedule. Currently, 4 is the limit with 12 crops because there's 20k/2k-opt ops at 7 seconds. 5 would be 250k/100k-opt ops at 6 minutes!
+        private static readonly int MaxNumCropTypes = 4;
         // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule.
         private static readonly bool HeuristicA = false;
 
