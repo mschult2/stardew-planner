@@ -22,6 +22,36 @@ namespace StardewCropCalculatorLibrary
         /// <summary> The state of our farm on a particular day. Ie, how many plants, free tiles, and gold we have. </summary>
         public readonly SortedDictionary<int, GameState> GameStates = new SortedDictionary<int, GameState>();
 
+        /// <summary>
+        /// Get all planted crops in the order we plant them.
+        /// </summary>
+        /// <returns>Non-null list. Empty if nothing planted.</returns>
+        public List<PlantBatch> GetPlantSequence()
+        {
+            var plantBatchSequence = new List<PlantBatch>();
+            var plantBatchIdSequence = new List<string>();
+
+            foreach (KeyValuePair<int, GameState> curGameStatePair in GameStates)
+            {
+                var curDay = curGameStatePair.Key;
+                var curGameState = curGameStatePair.Value;
+
+                if (curGameState.DayOfInterest)
+                {
+                    foreach (var plantBatch in curGameState.Plants)
+                    {
+                        if (!plantBatchIdSequence.Contains(plantBatch.Id))
+                        {
+                            plantBatchSequence.Add(plantBatch);
+                            plantBatchIdSequence.Add(plantBatch.Id);
+                        }
+                    }
+                }
+            }
+
+            return plantBatchSequence;
+        }
+
         private GameStateCalendar(int numDays)
         {
             NumDays = numDays;
@@ -43,18 +73,11 @@ namespace StardewCropCalculatorLibrary
         }
 
         /// <summary>
-        /// Deep copy is default. Can optionally choose shallow copy.
+        /// Clone input calendar. Input range is deep copy that is safe to modify. The other days are read-only shallow copies.
         /// </summary>
-        public GameStateCalendar(GameStateCalendar otherCalendar)
-        {
-            NumDays = otherCalendar.NumDays;
-
-            for (int i = 1; i <= NumDays + 1; ++i)
-                GameStates.Add(i, new GameState());
-
-            Merge(otherCalendar);
-        }
-
+        /// <param name="otherCalendar">Input calendar to copy.</param>
+        /// <param name="startingDay">Use 1 to start at beginning of season.</param>
+        /// <param name="endingDay">Use 0 to go to end of season.</param>
         public GameStateCalendar(GameStateCalendar otherCalendar, int startingDay, int endingDay)
         {
             NumDays = otherCalendar.NumDays;
@@ -161,10 +184,14 @@ namespace StardewCropCalculatorLibrary
         public bool Persistent => CropType.IsPersistent(NumDays);
         public int NumDays { get; }
 
+        public string Id { get; }
+
         public int PlantDay;
 
         public PlantBatch(Crop cropType, int cropCount, int plantDay, int numDays)
         {
+            Id = Guid.NewGuid().ToString();
+
             NumDays = numDays;
             CropType = cropType;
             Count = cropCount;
@@ -176,6 +203,7 @@ namespace StardewCropCalculatorLibrary
 
         public PlantBatch(PlantBatch otherPlantBatch)
         {
+            Id = otherPlantBatch.Id;
             CropType = otherPlantBatch.CropType;
             Count = otherPlantBatch.Count;
             PlantDay = otherPlantBatch.PlantDay;
@@ -221,8 +249,10 @@ namespace StardewCropCalculatorLibrary
         private static readonly int SignificantDigits = 2;
         // Optimization: cache completed (best?) schedules.
         private static readonly bool UseCache = true;
-        // Optimization: max number of crops to include in one schedule.
-        private static readonly int MaxNumCropTypes = 4;
+        // Optimization: max number of crops to include in schedule.
+        private static readonly int MaxNumCropTypes = 5;
+        // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule.
+        private static readonly bool HeuristicA = false;
 
         private int NumDays;
 
@@ -242,8 +272,6 @@ namespace StardewCropCalculatorLibrary
 
         // Memory threshold in GB. Necessary because browser tabs only allow WebAssembly apps to use 2 GB of memory. (Javascript is 4 GB)
         private double memoryThreshold = 1.38;
-
-        private bool useStrategy1 = true;
 
         /// <summary>
         /// The time between the day on which we harvest and the day on which we get gold.
@@ -303,7 +331,6 @@ namespace StardewCropCalculatorLibrary
             // PPI STRATEGY (use for heuristic)
             var localCrops = new List<Crop>(Crops);
             var bestCrops = new HashSet<Crop>();
-
             {
                 var numIterations = Crops.Count;
 
@@ -313,36 +340,47 @@ namespace StardewCropCalculatorLibrary
 
                     GetBestSchedule_Strategy2(1, localCrops, calendar);
 
-                    if (calendar.Wealth > wealth.Item1)
-                        wealth = Tuple.Create(calendar.Wealth, calendar);
-
-                    var dayOnePlants = calendar.GameStates[1].Plants;
-                    if (dayOnePlants != null && dayOnePlants.Count > 0 && dayOnePlants[0] != null && dayOnePlants[0].Count > 0 && localCrops.Count > 0 && localCrops.Contains(dayOnePlants[0].CropType))
+                    // Heuristic A: take top crop from best schedule
+                    if (HeuristicA)
                     {
-                        var topCrop = dayOnePlants[0].CropType;
-                        localCrops.Remove(topCrop);
-
-                        // Heuristic A: take top crop
-                        if (bestCrops.Count < MaxNumCropTypes)
+                        var dayOnePlants = calendar.GameStates[1].Plants;
+                        if (bestCrops.Count < MaxNumCropTypes && dayOnePlants != null && dayOnePlants.Count > 0 && dayOnePlants[0] != null && dayOnePlants[0].Count > 0 && localCrops.Count > 0 && localCrops.Contains(dayOnePlants[0].CropType))
+                        {
+                            var topCrop = dayOnePlants[0].CropType;
+                            localCrops.Remove(topCrop);
                             bestCrops.Add(topCrop);
-
-                        //// Heuristic B: take all crops
-                        //if (bestCrops.Count < MaxNumCropTypes)
-                        //{
-                        //    int numCropTypesLeft = MaxNumCropTypes - bestCrops.Count;
-                        //    int length = Math.Min(numCropTypesLeft, dayOnePlants.Count);
-
-                        //    for (int plantIndex = 0; plantIndex < length; ++plantIndex)
-                        //        bestCrops.Add(dayOnePlants[plantIndex].CropType);
-                        //}
+                        }
+                        // Short-circuit this strategy if we're only using it to obtain a heuristic
+                        else
+                            break;
                     }
                     else
-                        break;
+                    {
+                        // Heuristic B: take all crops from best schedule
+                        var plantBatchSequence = calendar.GetPlantSequence();
+                        if (bestCrops.Count < MaxNumCropTypes && plantBatchSequence.Count > 0)
+                        {
+                            for (int plantIndex = 0; plantIndex < plantBatchSequence.Count; ++plantIndex)
+                            {
+                                var cropToAdd = plantBatchSequence[plantIndex].CropType;
+                                bestCrops.Add(cropToAdd);
+                                localCrops.Remove(cropToAdd);
+
+                                if (bestCrops.Count >= MaxNumCropTypes)
+                                    break;
+                            }
+                        }
+                        // Short-circuit this strategy if we're only using it to obtain a heuristic
+                        else
+                            break;
+                    }
                 }
             }
 
-            // GAME STATE SIMULATION
-            if (useStrategy1)
+            if (bestCrops.Count < MaxNumCropTypes && bestCrops.Count < Crops.Count)
+                Console.WriteLine($"WARNING: Top crop list wasn't as long as it's supposed to be. Length {bestCrops.Count} instead of {MaxNumCropTypes}");
+
+            // SIMULATION STRATEGY
             {
                 var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
@@ -536,17 +574,12 @@ namespace StardewCropCalculatorLibrary
                             daysOfInterest.Add(harvestDay + PaydayDelay);
                     }
                 }
-                // If no profitable crop is left, then we're done
-                else
-                {
-                    break;
-                }
             }
 
             return;
         }
 
-        private void UpdateCalendar(GameStateCalendar calendar, int unitsToPlant, Crop crop, int day, int numDays)
+        private void UpdateCalendar(GameStateCalendar calendar, in int unitsToPlant, in Crop crop, int day, in int numDays)
         {
             if (unitsToPlant <= 0)
                 return;
@@ -577,7 +610,8 @@ namespace StardewCropCalculatorLibrary
 
                     if (curUnits > 0)
                     {
-                        calendar.GameStates[j].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
+                        // TODO: Is it more performant to use same PlantBatch, since it's ontologically the same set of plants? Would have to ensure it doesn't mess up the algorithm.
+                        calendar.GameStates[j].Plants.Add(new PlantBatch(plantBatch));
 
                         if (availableTiles != -1)
                             calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;
@@ -599,7 +633,7 @@ namespace StardewCropCalculatorLibrary
                         if (availableTiles != -1)
                             calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;
 
-                        calendar.GameStates[j].Plants.Add(new PlantBatch(crop, unitsToPlant, day, numDays));
+                        calendar.GameStates[j].Plants.Add(new PlantBatch(plantBatch));
                     }
 
                     // Modify gold
