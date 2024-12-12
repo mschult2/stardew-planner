@@ -685,7 +685,8 @@
     // private double AvailableGold = 5000;
     // private int AvailableTiles = 0;
 
-    /* Test 3: Answer is: d1 83 hop, d13 41 tomato, d14 5 star, d15 5 star, d16-d20 41 spangle. Profit 45k.
+    /* Test 3
+    * DayAfter answer is: d1 83 hop, d13 41 tomato, d14 5 star, d15 5 star, d16-d20 ~41 spangle. Profit 45k.
     * SIG DIGIT WORKS: Takes 40 seconds with sig dig 2, 6 seconds with sig dig 1!
     * Results changed, but trivially. The two days of 5 starfruits were replaced with more 41 spangles.
     * Tree data structure: 0.2 seconds!
@@ -1164,7 +1165,7 @@
                 {
                     double curGold = AvailableGold;
 
-                    GameStateCalendar calendar = new GameStateCalendar(NumDays, AvailableTiles, AvailableGold);
+                    GameStateCalendar calendar = new GameStateCalendar(NumDays, 0, 0);
 
                     calendar.GameStates[0] = new GameState() { Wallet = AvailableGold, };
 
@@ -1172,9 +1173,9 @@
                     {
                         // Copy game state from previous day
                         var prevGameState = calendar.GameStates[day - 1];
-                        var curGameState = calendar.GameStates[day] = new GameState();
+                        var curGameState = calendar.GameStates[day];
 
-                        curGameState.Wallet = calendar.GameStates[day - 1].Wallet;
+                        curGameState.Wallet += calendar.GameStates[day - 1].Wallet;
 
                         if (prevGameState.Plants != null && prevGameState.Plants.Count > 0)
                         {
@@ -1187,7 +1188,7 @@
                             }
                         }
 
-                        // Harvest day
+                        // Harvest day - add gold, subtract plants
                         if (day <= NumDays && curGameState.Plants != null && curGameState.Plants.Count > 0)
                         {
                             List<PlantBatch> curDayPlants = curGameState.Plants;
@@ -1198,8 +1199,7 @@
                                 if (plantBatch.HarvestDays.Contains(day))
                                 {
                                     // Add gold
-                                    var crop = plantBatch.CropType;
-                                    curGameState.Wallet = curGameState.Wallet + plantBatch.Count * crop.sellPrice;
+                                    calendar.GameStates[day + factory.PaydayDelay].Wallet += plantBatch.Count * plantBatch.CropType.sellPrice;
 
                                     // Subtract plants
                                     if (!plantBatch.Persistent)
@@ -1211,20 +1211,19 @@
                                 curGameState.Plants.Remove(plantToRemove);
                         }
 
-                        // Buy day
+                        // Buy day - subtract gold, add plants
                         if (day <= NumDays && PlantingDays[day])
                         {
                             var crop = Schedule.GetCrop(day);
                             var unitsToPlant = (int)(curGameState.Wallet / Schedule.GetCrop(day).buyPrice);
                             ScheduleDetails[day] = new DayDetails() { cropsNumberToPlant = new List<int>() { unitsToPlant } };
 
-                            // Subtract gold and add plants
-                            curGameState.Wallet = curGameState.Wallet - unitsToPlant * crop.buyPrice;
+                            curGameState.Wallet -= unitsToPlant * crop.buyPrice;
                             curGameState.Plants.Add(new PlantBatch(crop, unitsToPlant, day, NumDays));
                         }
                     }
 
-                    // Update Profit/ROI, since the original is fractional.
+                    // Update Profit/ROI, since the original is fractional
                     var newProfit = calendar.Wealth - AvailableGold;
 
                     if (calendar.Wealth > 0 && newProfit > 0)

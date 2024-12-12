@@ -37,7 +37,7 @@ namespace StardewCropCalculatorLibrary
 
         private int StartDay;
 
-        private int PaydayDelay;
+        public int PaydayDelay { get; private set; }
 
         public PlantScheduleFactory(int _numDays, int _startDay, int _paydayDelay)
         {
