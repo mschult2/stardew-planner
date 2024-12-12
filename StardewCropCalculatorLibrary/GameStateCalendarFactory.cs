@@ -175,18 +175,20 @@ namespace StardewCropCalculatorLibrary
     /// <summary>
     /// A batch of crops planted on our farm. All one type, all planted at the same time.
     /// A batch can be treated as one super-plant harvested all at once.
+    /// This class meant to be IMMUTABLE. Do not modify after construction.
     /// </summary>
     public class PlantBatch
     {
-        public Crop CropType = null;
-        public int Count = 0;
-        public readonly SortedSet<int> HarvestDays = new SortedSet<int>();
+        public Crop CropType { get; }
+        public int Count { get; }
+        /// <summary> PlantBatch is supposed to be read-only so it can be reused, so don't modify this after construction. </summary>
+        public SortedSet<int> HarvestDays { get; } = new SortedSet<int>();
         public bool Persistent => CropType.IsPersistent(NumDays);
         public int NumDays { get; }
 
         public string Id { get; }
 
-        public int PlantDay;
+        public int PlantDay { get; }
 
         public PlantBatch(Crop cropType, int cropCount, int plantDay, int numDays)
         {
@@ -251,7 +253,7 @@ namespace StardewCropCalculatorLibrary
         private static readonly bool UseCache = true;
         // Optimization: max number of crops to include in schedule. Currently, 4 is the limit with 12 crops because there's 20k/2k-opt ops at 7 seconds. 5 would be 250k/100k-opt ops at 6 minutes!
         private static readonly int MaxNumCropTypes = 4;
-        // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule.
+        // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule. B has performed better.
         private static readonly bool HeuristicA = false;
 
         private int NumDays;
@@ -611,7 +613,8 @@ namespace StardewCropCalculatorLibrary
                     if (curUnits > 0)
                     {
                         // TODO: Is it more performant to use same PlantBatch, since it's ontologically the same set of plants? Would have to ensure it doesn't mess up the algorithm.
-                        calendar.GameStates[j].Plants.Add(new PlantBatch(plantBatch));
+                        calendar.GameStates[j].Plants.Add(plantBatch);
+
 
                         if (availableTiles != -1)
                             calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;
@@ -633,7 +636,7 @@ namespace StardewCropCalculatorLibrary
                         if (availableTiles != -1)
                             calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;
 
-                        calendar.GameStates[j].Plants.Add(new PlantBatch(plantBatch));
+                        calendar.GameStates[j].Plants.Add(plantBatch);
                     }
 
                     // Modify gold
@@ -681,7 +684,7 @@ namespace StardewCropCalculatorLibrary
             double memoryInGB = memoryInBytes / (1024.0 * 1024.0 * 1024.0);
 
             Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
-            Console.WriteLine($"Memory usage: {memoryInGB:F2} GB");
+            Console.WriteLine($"Memory usage: {memoryInGB:F3} GB");
 
             if (memoryInGB >= memoryThreshold)
                 return true;
