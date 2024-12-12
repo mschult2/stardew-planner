@@ -253,7 +253,7 @@
                     {
                         <div class="calendar-overlay">
                             <div class="spinner"></div>
-                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 20 seconds</p>
+                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 60 seconds</p>
                         </div>
                     }
                 </div>
@@ -809,9 +809,9 @@
     // private double AvailableGold = 100000;
     // private int AvailableTiles = 400000;
 
-    /* Test 10: Coral Island Spring Crops - Level E
-     * Correct answer: Potato/Radish/Cauli/Cauli, Profit is 4580 coins
-     */
+     /* Test 10: Coral Island Spring Crops - Level E
+    * Correct answer: Potato/Radish/Cauli/Cauli, Profit is 4580 coins
+    */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("CI Radish", 6, 1000, 60, 108),
@@ -1168,7 +1168,7 @@
 
                     calendar.GameStates[0] = new GameState() { Wallet = AvailableGold, };
 
-                    for (int day = 1; day <= NumDays; ++day)
+                    for (int day = 1; day <= NumDays + 1; ++day)
                     {
                         // Copy game state from previous day
                         var prevGameState = calendar.GameStates[day - 1];
@@ -1176,15 +1176,25 @@
 
                         curGameState.Wallet = calendar.GameStates[day - 1].Wallet;
 
-                        foreach (var prevPlantBatch in calendar.GameStates[day - 1].Plants)
-                            curGameState.Plants.Add(new PlantBatch(prevPlantBatch));
-
-                        // Sell day
+                        if (prevGameState.Plants != null && prevGameState.Plants.Count > 0)
                         {
-                            var plantsToRemove = new List<PlantBatch>();
-                            foreach (var plantBatch in curGameState.Plants)
+                            List<PlantBatch> prevDayPlants = prevGameState.Plants;
+
+                            foreach (var prevPlantBatch in prevDayPlants)
                             {
-                                // Sell day
+                                if (prevPlantBatch != null && prevPlantBatch.Count > 0)
+                                    curGameState.Plants.Add(new PlantBatch(prevPlantBatch));
+                            }
+                        }
+
+                        // Harvest day
+                        if (day <= NumDays && curGameState.Plants != null && curGameState.Plants.Count > 0)
+                        {
+                            List<PlantBatch> curDayPlants = curGameState.Plants;
+
+                            var plantsToRemove = new List<PlantBatch>();
+                            foreach (var plantBatch in curDayPlants)
+                            {
                                 if (plantBatch.HarvestDays.Contains(day))
                                 {
                                     // Add gold
@@ -1202,7 +1212,7 @@
                         }
 
                         // Buy day
-                        if (PlantingDays[day])
+                        if (day <= NumDays && PlantingDays[day])
                         {
                             var crop = Schedule.GetCrop(day);
                             var unitsToPlant = (int)(curGameState.Wallet / Schedule.GetCrop(day).buyPrice);
@@ -1212,6 +1222,15 @@
                             curGameState.Wallet = curGameState.Wallet - unitsToPlant * crop.buyPrice;
                             curGameState.Plants.Add(new PlantBatch(crop, unitsToPlant, day, NumDays));
                         }
+                    }
+
+                    // Update Profit/ROI, since the original is fractional.
+                    var newProfit = calendar.Wealth - AvailableGold;
+
+                    if (calendar.Wealth > 0 && newProfit > 0)
+                    {
+                        Profit = newProfit;
+                        InvestmentMultiplier = calendar.Wealth / AvailableGold;
                     }
                 }
             }
