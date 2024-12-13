@@ -28,7 +28,7 @@
             <input type="number" @bind="NewCropTimeToMaturity" />
         </div>
         <div class="form-row">
-            <label>Days Between Harvests:</label>
+            <label>Days to Regrowth:</label>
             <input type="number" @bind="NewCropYieldRate" />
             <span>(Leave 0 for plants that die after one harvest)</span>
         </div>
@@ -77,7 +77,7 @@
                     <div class="crop-content">
                         <input type="checkbox" checked="@crop.IsEnabled" @onchange="(e => ToggleCrop(crop, e))" />
                         <span class="@(!crop.IsEnabled ? "disabled-crop" : "")">
-                            @crop.name (Matures: @crop.timeToMaturity days, @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $"Yield Rate: {crop.yieldRate} days" : "Yield Rate: N/A")
+                            @crop.name (Matures: @crop.timeToMaturity days, @(crop.yieldRate > 0 && crop.yieldRate < 1000 ? $"Regrowth: {crop.yieldRate} days" : "Regrowth: N/A")
                             , Cost: @crop.buyPrice g,
                             Sell Price: @crop.sellPrice g)
                         </span>
@@ -838,6 +838,7 @@
     private static readonly int DefaultNumDays = 28;
 
     private bool SameDay = true;
+    private int PaydayDelay => SameDay ? 0 : 1;
 
     private int _currentDay = DefaultDay;
     private int CurrentDay
@@ -954,7 +955,6 @@
         }
     }
 
-
     // Input properties for a new crop
     private string NewCropName = string.Empty;
     private int NewCropTimeToMaturity;
@@ -984,7 +984,7 @@
     private void UpdateSameDay(bool sameDayEnabled)
     {
         SameDay = sameDayEnabled;
-        GameStateCalendarFactory.PaydayDelay = SameDay ? 0 : 1;
+        GameStateCalendarFactory.PaydayDelay = PaydayDelay;
     }
 
     private void OnCurrentDayChanged()
@@ -1147,7 +1147,7 @@
             // Calculate schedule with ROI formula (fast, but doesn't support tile limit)
             else
             {
-                var factory = new PlantScheduleFactory(NumDays, CurrentDay, SameDay ? 0 : 1);
+                var factory = new PlantScheduleFactory(NumDays, CurrentDay, PaydayDelay);
 
                 InvestmentMultiplier = factory.GetBestSchedule(Crops, out PlantSchedule bestSchedule);
 
