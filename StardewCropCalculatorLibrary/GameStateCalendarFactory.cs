@@ -256,6 +256,16 @@ namespace StardewCropCalculatorLibrary
         // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule. B has performed better.
         private static readonly bool HeuristicA = false;
 
+        // (Only matters for next-day Payday) If false, then return tiles as soon as crop is harvested, which is more realistic. And it helps with cases where we needed just *one more day* to make a sale.
+        //    -> EXAMPLE: MikeFruit: 14, NA, 200, 400; Gold: 40,000; Tiles: 100; SeasonLength: 29, DayAfter. Profit is 40k instead of 20k, since we were only tile-limited and so had time to plant 1 more batch. 
+        // However, holding onto those tiles until we get the next-day gold might be smarter in some cases...because what if we're in a very precise corner case where we are tile-limited, but only have enough
+        // surplus gold to buy a cheaper crop (like Hot Pepper), when the next day we would've had enough money to plant a Starfruit.
+        // Really the best solve seems to add a no-crop option, so we can always delay planting. But I think that would wreck performance, because now every choice has a minimum span of 1 day.
+        //    -> COUNTEREXAMPLE: MikeFruit + CheapFruit: 10, NA, 50, 150; Gold: 300; Tiles: 1; SeasonLength: 30, DayAfter. Profit is 300 instead of 400, because we chose to plant CheapFruit instead of waiting a day and planting StarFruit.
+        //       This situation occurs because we were tile-limited, but the gold-limit was so close behind we couldn't afford the better fruit.
+        // Summary: it may be that counterexample only occurs because we had a single tile, and the other confluences make it seem unlikely to occur. So setting ReturnTilesAsap true.
+        private static readonly bool ReturnTilesAsap = true;
+
         private int NumDays;
 
         private int StartDay;
@@ -487,7 +497,10 @@ namespace StardewCropCalculatorLibrary
                     if (unitsToPlant > 0)
                     {
                         // Update game state based on the current purchase.
-                        UpdateCalendar(thisCropCalendar, unitsToPlant, crop, day, numDays);
+                        if (ReturnTilesAsap)
+                            UpdateCalendar(thisCropCalendar, unitsToPlant, crop, day, numDays);
+                        else
+                            UpdateCalendar_HoldTiles(thisCropCalendar, unitsToPlant, crop, day, numDays);
 
                         // Queue up updating game state based on subsequent purchases.
                         for (int j = day + 1; j <= numDays; ++j)
@@ -568,7 +581,10 @@ namespace StardewCropCalculatorLibrary
                 // Add best crop's paydays
                 if (bestCrop != null)
                 {
-                    UpdateCalendar(calendar, bestNumToPlant, bestCrop, day, NumDays);
+                    if (ReturnTilesAsap)
+                        UpdateCalendar(calendar, bestNumToPlant, bestCrop, day, NumDays);
+                    else
+                        UpdateCalendar_HoldTiles(calendar, bestNumToPlant, bestCrop, day, NumDays);
 
                     foreach (int harvestDay in bestCrop.HarvestDays(day, NumDays))
                     {
@@ -581,7 +597,62 @@ namespace StardewCropCalculatorLibrary
             return;
         }
 
+        /// <summary>
+        /// Update calendar to reflect planting this batch on this day. Returns tiles on day of harvest!
+        /// </summary>
         private void UpdateCalendar(GameStateCalendar calendar, in int unitsToPlant, in Crop crop, int day, in int numDays)
+        {
+            if (unitsToPlant <= 0)
+                return;
+
+            int availableTiles = calendar.GameStates[day].FreeTiles;
+
+            // Modify current day state.
+            double cost = unitsToPlant * crop.buyPrice;
+            double sale = unitsToPlant * crop.sellPrice;
+            PlantBatch plantBatch = new PlantBatch(crop, unitsToPlant, day, numDays);
+            var harvestDays = plantBatch.HarvestDays;
+
+            double cumulativeSale = 0;
+            int curUnits = unitsToPlant;
+
+            calendar.GameStates[day].DayOfInterest = true;
+
+            // Update game state calendar based on today's crop purchase.
+            for (int j = day; j <= calendar.NumDays + 1; ++j)
+            {
+                // Harvest day might increase tiles:
+                if (plantBatch.HarvestDays.Contains(j))
+                {
+                    if (!plantBatch.Persistent && curUnits != 0)
+                        curUnits = 0;
+                }
+
+                // Payday increases gold:
+                if (plantBatch.HarvestDays.Contains(j - PaydayDelay))
+                {
+                    cumulativeSale += sale;
+                    calendar.GameStates[j].DayOfInterest = true;
+                }
+
+                // Decrease tiles if plant isn't dead
+                if (curUnits > 0)
+                {
+                    if (availableTiles != -1)
+                        calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;
+
+                    calendar.GameStates[j].Plants.Add(plantBatch);
+                }
+
+                // Modify gold
+                calendar.GameStates[j].Wallet = calendar.GameStates[j].Wallet + cumulativeSale - cost;
+            }
+        }
+
+        /// <summary>
+        /// Update calendar to reflect planting this batch on this day. Returning tiles coincides with payday.
+        /// </summary>
+        private void UpdateCalendar_HoldTiles(GameStateCalendar calendar, in int unitsToPlant, in Crop crop, int day, in int numDays)
         {
             if (unitsToPlant <= 0)
                 return;
@@ -612,9 +683,7 @@ namespace StardewCropCalculatorLibrary
 
                     if (curUnits > 0)
                     {
-                        // TODO: Is it more performant to use same PlantBatch, since it's ontologically the same set of plants? Would have to ensure it doesn't mess up the algorithm.
                         calendar.GameStates[j].Plants.Add(plantBatch);
-
 
                         if (availableTiles != -1)
                             calendar.GameStates[j].FreeTiles = calendar.GameStates[j].FreeTiles - curUnits;

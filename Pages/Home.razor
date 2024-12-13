@@ -141,7 +141,7 @@
             Same Day
             <input type="radio" style="margin-left: 40px;" checked="@(SameDay == false)" @onchange="@(() => UpdateSameDay(false))" />
             Day After
-            <span style ="margin-left: 53px;">(same day if possible vs always the day after)</span>
+            <span style ="margin-left: 53px;">(Replant: same day VS the day after)</span>
         </div>
     </form>
 </div>
@@ -1118,10 +1118,9 @@
 
                         var dayState = calendar.GameStates[day];
 
-                        // Currently days-of-interest only represent planting paydays (not harvest days)
+                        // Day-of-interest represents payday and thus plantday
                         if (dayState.DayOfInterest && dayState.Plants.Count > 0)
                         {
-                            // Console.WriteLine($"Day {day}: {dayState}");
                             foreach (var batch in dayState.Plants)
                             {
                                 if (batch.PlantDay == day && batch.Count > 0)
@@ -1135,10 +1134,9 @@
 
                                     ScheduleDetails[day].cropsNumberToPlant.Add(batch.Count);
 
+                                    // Add every subsequent harvest day for this plant batch
                                     foreach (int harvestDay in batch.HarvestDays)
-                                    {
                                         HarvestDays[harvestDay] = true;
-                                    }
                                 }
                             }
                         }
