@@ -555,7 +555,7 @@ namespace StardewCropCalculatorLibrary
 
                 foreach (var crop in crops)
                 {
-                    double curProfitMetric = crop.CurrentProfit(day, curGameState.FreeTiles, curGameState.Wallet, NumDays, out int numToPlant);
+                    double curProfitMetric = crop.CurrentProfit(day, curGameState.FreeTiles, curGameState.Wallet, NumDays, PaydayDelay, out int numToPlant);
 
                     if (curProfitMetric > bestProfitMetric)
                     {

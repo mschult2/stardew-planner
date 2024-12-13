@@ -23,7 +23,7 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// Per-tile profitability index starting on a specific day.
         /// </summary>
-        public int CurrentProfitIndex(int day, int numDays)
+        public int CurrentProfitIndex(int day, int numDays, int paydayDelay)
         {
             if (IsPersistent(numDays))
             {
@@ -36,7 +36,18 @@ namespace StardewCropCalculatorLibrary
             }
             else
             {
-                int numHarvests = (numDays + 1 - day) / (timeToMaturity + 1);
+                int totalDays = numDays - day;
+
+                int numHarvests = totalDays / (timeToMaturity + paydayDelay);
+
+                // The last iteration only needs to be timeToMaturity long to get a harvest, not timeToMaturity + paydayDelay.
+                if (paydayDelay > 0)
+                {
+                    double remainingDays = totalDays % (double)(timeToMaturity + paydayDelay);
+
+                    if (remainingDays >= timeToMaturity)
+                        ++numHarvests;
+                }
 
                 if (numHarvests <= 0)
                     return (int) -buyPrice;
@@ -48,7 +59,7 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// The real profit, in gold, if we plant the entire farm with this crop.
         /// </summary>
-        public double CurrentProfit(int day, int availableTiles, double availableGold, int numDays, out int numToPlant)
+        public double CurrentProfit(int day, int availableTiles, double availableGold, int numDays, int PaydayDelay, out int numToPlant)
         {
             if (buyPrice > 0)
             {
@@ -70,7 +81,7 @@ namespace StardewCropCalculatorLibrary
 
             }
 
-            return numToPlant * CurrentProfitIndex(day, numDays);
+            return numToPlant * CurrentProfitIndex(day, numDays, PaydayDelay);
         }
 
         /// <summary>
