@@ -55,7 +55,7 @@ namespace StardewCropCalculatorLibrary
         }
 
         /// <summary>
-        /// Calculates the best crop to plant on each day.
+        /// Calculates the best crop to plant on each day if there is no tile space limitation.
         /// Uses a dynamic programming algorithm which memoizes the best schedule by iterating through it backward.
         /// </summary>
         /// <param name="crops">The crops which are available to be purchased</param>
@@ -65,6 +65,50 @@ namespace StardewCropCalculatorLibrary
         public double GetBestSchedule(List<Crop> crops, out PlantSchedule schedule)
         {
             crops = crops.Where(c => c.IsEnabled).ToList();
+
+            // Check for free crop, which would result in infinite ROI.
+            List<Crop> freeCrops = crops.Where(c => c.buyPrice <= 0 && c.sellPrice > 0).ToList();
+
+            if (freeCrops.Count > 0)
+            {
+                freeCrops.ForEach(c => Console.WriteLine($"{c.name}: found free crop! Infinite ROI."));
+
+                for (int day = 1; day <= numDays; ++day)
+                {
+                    Crop bestCrop = null;
+                    int bestProfitIndex = 0;
+
+                    foreach (var crop in freeCrops)
+                    {
+                        int profitIndex = crop.CurrentProfitIndex(day, numDays, PaydayDelay);
+
+                        if (profitIndex > bestProfitIndex)
+                        {
+                            bestCrop = crop;
+                            bestProfitIndex = profitIndex;
+                        }
+                    }
+
+                    if (bestCrop != null)
+                    {
+                        memo.schedule.SetCrop(day, bestCrop);
+                        memo.cumMultiple[day] = Double.MaxValue;
+                    }
+                    else
+                    {
+                        memo.cumMultiple[day] = 1;
+                    }
+                }
+
+                // Return memo, which is now filled out with the best schedule.
+                schedule = new PlantSchedule(memo.schedule);
+
+                // Shift schedule if there's a particular start day
+                if (StartDay > 1)
+                    schedule = ShiftSchedule(schedule);
+
+                return memo.cumMultiple[1];
+            }
 
             // Find the best crop for each day, starting from end of season.
             for (int day = numDays; day > 0; --day)
@@ -94,30 +138,23 @@ namespace StardewCropCalculatorLibrary
                     // Update best crop for the current day.
                     if (cumInvestmentMultiple > memo.cumMultiple[day])
                     {
+                        if (Double.IsPositiveInfinity(cumInvestmentMultiple))
+                            Console.WriteLine($"Warning: ROI is too large of a number to be supported.");
+
                         memo.cumMultiple[day] = cumInvestmentMultiple;
                         memo.schedule.SetCrop(day, crop);
                     }
-
-                    if (Double.IsPositiveInfinity(cumInvestmentMultiple))
-                        throw new Exception("Cumulative investment multiple is too large of a number!");
                 }
             }
 
             // Return memo, which is now filled out with the best schedule.
             schedule = new PlantSchedule(memo.schedule);
-            var investmentMultiple = memo.cumMultiple[1];
 
+            // Shift schedule if there's a particular start day
             if (StartDay > 1)
-            {
-                var shiftedSchedule = new PlantSchedule(numDays + StartDay - 1);
+                schedule = ShiftSchedule(schedule);
 
-                for (int i = 1; i <= numDays; ++i)
-                    shiftedSchedule.AddCrop(i + StartDay - 1, schedule.GetCrop(i));
-
-                schedule = shiftedSchedule;
-            }
-
-            return investmentMultiple;
+            return memo.cumMultiple[1];
         }
 
         /// <summary>
@@ -185,6 +222,23 @@ namespace StardewCropCalculatorLibrary
                     shiftedHarvestDays[i + StartDay - 1] = harvestDays[i];
 
                 harvestDays = shiftedHarvestDays;
+            }
+        }
+
+        private PlantSchedule ShiftSchedule(in PlantSchedule plantSchedule)
+        {
+            if (StartDay > 1)
+            {
+                var shiftedSchedule = new PlantSchedule(numDays + StartDay - 1);
+
+                for (int i = 1; i <= numDays; ++i)
+                    shiftedSchedule.AddCrop(i + StartDay - 1, plantSchedule.GetCrop(i));
+
+                return shiftedSchedule;
+            }
+            else
+            {
+                return new PlantSchedule(numDays);
             }
         }
     }
