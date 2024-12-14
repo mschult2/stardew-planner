@@ -252,7 +252,7 @@ namespace StardewCropCalculatorLibrary
         // Optimization: cache completed (best?) schedules.
         private static readonly bool UseCache = true;
         // Optimization: max number of crops to include in schedule. Currently, 4 is the limit with 12 crops because there's 20k/2k-opt ops at 7 seconds. 5 would be 250k/100k-opt ops at 6 minutes!
-        private static readonly int MaxNumCropTypes = 4;
+        private static readonly int MaxNumCropTypes = 5;
         // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule. B has performed better.
         private static readonly bool HeuristicA = false;
         // (Only matters for next-day Payday) If false, then return tiles as soon as crop is harvested, which is more realistic. And it helps with cases where we needed just *one more day* to make a sale.
@@ -321,6 +321,7 @@ namespace StardewCropCalculatorLibrary
             daysToEvaluate.Clear();
             numOperationsStat = 0;
             numCacheHitsStat = 0;
+            int numCropTypes = MaxNumCropTypes;
 
             bool infiniteGold = false;
 
@@ -334,11 +335,31 @@ namespace StardewCropCalculatorLibrary
                 infiniteGold = true;
             }
 
+            double tg = availableTiles == -1 ? 0 : availableTiles / availableGold;
+
+            // Trigger perf break if high tile-to-gold ratio, since those take a long time to compute.
+            if (tg > 0.4)
+            {
+                Console.WriteLine($"Passed TG limit: {tg}. Lowering crop limit to 2.");
+                numCropTypes = Math.Min(numCropTypes, 2);
+            }
+            else if (tg > 0.2)
+            {
+                Console.WriteLine($"Passed TG limit: {tg}. Lowering crop limit to 3.");
+                numCropTypes = Math.Min(numCropTypes, 3);
+            }
+            else if (tg > 0.1)
+            {
+                Console.WriteLine($"Passed TG limit: {tg}. Lowering crop limit to 4.");
+                numCropTypes = Math.Min(numCropTypes, 4);
+            }
+
             startingGold = availableGold;
             startingTiles = availableTiles;
             Tuple<double, GameStateCalendar> wealth = Tuple.Create<double, GameStateCalendar>(0.0, null);
 
             // PPI STRATEGY (use for heuristic)
+            bool runSim = true;
             var localCrops = new List<Crop>(Crops);
             var bestCrops = new HashSet<Crop>();
             {
@@ -353,8 +374,9 @@ namespace StardewCropCalculatorLibrary
                     // Heuristic A: take top crop from best schedule
                     if (HeuristicA)
                     {
+
                         var dayOnePlants = calendar.GameStates[1].Plants;
-                        if (bestCrops.Count < MaxNumCropTypes && dayOnePlants != null && dayOnePlants.Count > 0 && dayOnePlants[0] != null && dayOnePlants[0].Count > 0 && localCrops.Count > 0 && localCrops.Contains(dayOnePlants[0].CropType))
+                        if (bestCrops.Count < numCropTypes && dayOnePlants != null && dayOnePlants.Count > 0 && dayOnePlants[0] != null && dayOnePlants[0].Count > 0 && localCrops.Count > 0 && localCrops.Contains(dayOnePlants[0].CropType))
                         {
                             var topCrop = dayOnePlants[0].CropType;
                             localCrops.Remove(topCrop);
@@ -364,11 +386,23 @@ namespace StardewCropCalculatorLibrary
                         else
                             break;
                     }
+                    // Heuristic B: take all crops from best schedule
                     else
                     {
-                        // Heuristic B: take all crops from best schedule
                         var plantBatchSequence = calendar.GetPlantSequence();
-                        if (bestCrops.Count < MaxNumCropTypes && plantBatchSequence.Count > 0)
+
+                        // If PPI schedule has more crops than Sim, then we're kind of limiting ourself. So take PPI instead since it generally seems more profitable in this case.
+                        int uniqueCropsCount = plantBatchSequence.Select(x => x.CropType).Distinct().ToList().Count;
+
+                        if (i == 0 && uniqueCropsCount > numCropTypes)
+                        {
+                            Console.WriteLine($"Using PPI schedule, since it has more crops than Sim.");
+                            wealth = Tuple.Create(calendar.GameStates[NumDays + 1].Wallet, calendar);
+                            runSim = false;
+                            break;
+                        }
+
+                        if (bestCrops.Count < numCropTypes && plantBatchSequence.Count > 0)
                         {
                             for (int plantIndex = 0; plantIndex < plantBatchSequence.Count; ++plantIndex)
                             {
@@ -376,7 +410,7 @@ namespace StardewCropCalculatorLibrary
                                 bestCrops.Add(cropToAdd);
                                 localCrops.Remove(cropToAdd);
 
-                                if (bestCrops.Count >= MaxNumCropTypes)
+                                if (bestCrops.Count >= numCropTypes)
                                     break;
                             }
                         }
@@ -387,10 +421,11 @@ namespace StardewCropCalculatorLibrary
                 }
             }
 
-            if (bestCrops.Count < MaxNumCropTypes && bestCrops.Count < Crops.Count)
-                Console.WriteLine($"WARNING: Top crop list wasn't as long as it's supposed to be. Length {bestCrops.Count} instead of {MaxNumCropTypes}");
+            if (bestCrops.Count < numCropTypes && bestCrops.Count < Crops.Count)
+                Console.WriteLine($"WARNING: Top crop list wasn't as long as it's supposed to be. Length {bestCrops.Count} instead of {numCropTypes}");
 
             // SIMULATION STRATEGY
+            if (runSim)
             {
                 var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 

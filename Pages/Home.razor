@@ -254,7 +254,7 @@
                     {
                         <div class="calendar-overlay">
                             <div class="spinner"></div>
-                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 60 seconds</p>
+                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 30 seconds</p>
                         </div>
                     }
                 </div>
@@ -734,10 +734,8 @@
     // private int AvailableTiles = 100;
 
     /* Test 6: Stress Test
-    * ERROR: After 7min and 36,000 operations: "Garbage collector could not allocate 65536u bytes of memory for major heap section". (Browser was only using ~2GB) (17,585 cache hits)
-    * Same with cache disabled. Memeory usage 1.75 GB.
-    * Ah it's because a Chrome browser tab limits the WebAssembly heap memory to 2 GB. Javascript gets more, 4 GB!
-    * Results according to PPI strat, may not be correct: profit 89k. D1 125 pep, D7 125 pep, D10 125 pep, D13 star.
+    * Results: profit 99.5k. d1 400 wheat, d5 275 pep, d10 125 blue.
+    * Time: a few seconds.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -752,13 +750,15 @@
     //     new Crop("Starfruit", 13, 1000, 400, 750),
     //     new Crop("Wheat", 4, 1000, 10, 25),
     //     new Crop("Corn", 14, 4, 150, 50),
+
+    //     new Crop("Coffee Bean", timeToMaturity: 10, yieldRate: 2, buyPrice: 2500, sellPrice: 60),
+    //     new Crop("Sunflower", timeToMaturity: 8, yieldRate: 9, buyPrice: 200, sellPrice: 80),
     // };
     // private double AvailableGold = 5000;
     // private int AvailableTiles = 400;
 
     /* Test 7: Balanced TG 0.09
-    * IM results: profit 102k. D1 125 pep, d7 62 blue, d10 263 wheat, d15 174 melon, d16 63 melon.
-    * PPI results: profit 93k. D1 125 pep, D7 125 pep, D10 125 pep, D13 75 melon.
+    * Results: profit 109k. d1 450 wheat, d5 293 pep, d10 146 blue.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -812,8 +812,9 @@
     // private int AvailableTiles = 400000;
 
      /* Test 10: Coral Island Spring Crops - Level E
-    * Correct answer: Potato/Radish/Cauli/Cauli, Profit is 4580 coins
-    */
+     * Set HarvestPayday to DayAfter!
+     * Correct answer: Potato/Radish/Cauli/Cauli, Profit is 4580 coins (bad answer is Cucumber, profit 4260)
+     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("CI Radish", 6, 1000, 60, 108),
@@ -829,6 +830,8 @@
     // };
     // private double AvailableGold = 800;
     // private int AvailableTiles = 20;
+
+    /* Test 11: Infinite Gold. Result: most profitable fruit, like Starfruit. */
 
     private static readonly string SpringName = "Spring";
     private static readonly string SummerName = "Summer";
