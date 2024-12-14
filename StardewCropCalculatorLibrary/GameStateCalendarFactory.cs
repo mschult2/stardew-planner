@@ -255,7 +255,6 @@ namespace StardewCropCalculatorLibrary
         private static readonly int MaxNumCropTypes = 4;
         // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule. B has performed better.
         private static readonly bool HeuristicA = false;
-
         // (Only matters for next-day Payday) If false, then return tiles as soon as crop is harvested, which is more realistic. And it helps with cases where we needed just *one more day* to make a sale.
         //    -> EXAMPLE: MikeFruit: 14, NA, 200, 400; Gold: 40,000; Tiles: 100; SeasonLength: 29, DayAfter. Profit is 40k instead of 20k, since we were only tile-limited and so had time to plant 1 more batch. 
         // However, holding onto those tiles until we get the next-day gold might be smarter in some cases...because what if we're in a very precise corner case where we are tile-limited, but only have enough
@@ -265,6 +264,8 @@ namespace StardewCropCalculatorLibrary
         //       This situation occurs because we were tile-limited, but the gold-limit was so close behind we couldn't afford the better fruit.
         // Summary: Answer is also a little worse for test 10 Coral Island when using DayAfter. For that reason I won't enable it. I mean the user has to enable DayAfter, so really we should respect their choice.
         private static readonly bool ReturnTilesAsap = false;
+        // Memory threshold in GB. Necessary because browser tabs only allow WebAssembly apps to use 2 GB of memory. (Javascript is 4 GB)
+        private static readonly double MemoryThreshold = 1.38;
 
         private int NumDays;
 
@@ -281,9 +282,6 @@ namespace StardewCropCalculatorLibrary
         private double startingGold = 0;
 
         private Crop cheapestCrop = null;
-
-        // Memory threshold in GB. Necessary because browser tabs only allow WebAssembly apps to use 2 GB of memory. (Javascript is 4 GB)
-        private double memoryThreshold = 1.38;
 
         /// <summary>
         /// The time between the day on which we harvest and the day on which we get gold.
@@ -755,7 +753,7 @@ namespace StardewCropCalculatorLibrary
             Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
             Console.WriteLine($"Memory usage: {memoryInGB:F3} GB");
 
-            if (memoryInGB >= memoryThreshold)
+            if (memoryInGB >= MemoryThreshold)
                 return true;
             else
                 return false;
