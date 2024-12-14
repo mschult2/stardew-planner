@@ -263,8 +263,8 @@ namespace StardewCropCalculatorLibrary
         // Really the best solve seems to add a no-crop option, so we can always delay planting. But I think that would wreck performance, because now every choice has a minimum span of 1 day.
         //    -> COUNTEREXAMPLE: MikeFruit + CheapFruit: 10, NA, 50, 150; Gold: 300; Tiles: 1; SeasonLength: 30, DayAfter. Profit is 300 instead of 400, because we chose to plant CheapFruit instead of waiting a day and planting StarFruit.
         //       This situation occurs because we were tile-limited, but the gold-limit was so close behind we couldn't afford the better fruit.
-        // Summary: it may be that counterexample only occurs because we had a single tile, and the other confluences make it seem unlikely to occur. So setting ReturnTilesAsap true.
-        private static readonly bool ReturnTilesAsap = true;
+        // Summary: Answer is also a little worse for test 10 Coral Island when using DayAfter. For that reason I won't enable it. I mean the user has to enable DayAfter, so really we should respect their choice.
+        private static readonly bool ReturnTilesAsap = false;
 
         private int NumDays;
 
