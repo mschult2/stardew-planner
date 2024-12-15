@@ -661,11 +661,8 @@
     private double AvailableGold = 5000;
     private int AvailableTiles = 100;
 
-    /* Test 1: Answer is a few peps, melon, then a last pep. Profit 167k.
-    * SIG DIGIT: 2 sig dig takes 3m19s, 1 sig take takes only 35s!
-    * Gold pruning 0.2-0.4 thresh lowers it to 28s. Thresh 0.5 lowers it to 17s. And still accurate!
-    * Tree data structure: 1 second!
-    */
+    /* Test 1: Infinite Tiles (ROI)
+     * Answer is a bunch of peps, D16 melon, then a bunch of peps. Profit 235.6k. */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("Blueberry", 13, 4, 80, 150),
@@ -677,7 +674,7 @@
     // private double AvailableGold = 5000;
     // private int AvailableTiles = 0;
 
-    /* Test 2: Answer is all wheat, ofc. Profit 483k. IM takes 0.2 seconds. */
+    /* Test 2: Answer is all wheat, ofc. Profit 1.2m. */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("Hot Pepper", 5, 3, 40, 40),
@@ -689,9 +686,6 @@
     /* Test 3
     * SameDay: profit 49k. d1 83 hop, d12 41 spangle, d13 41 tomato, d14 5 star, d15 5 star, d16-d19 ~41 spangle, D20 115 spangle.
     * DayAfter: Profit 45k. d1 83 hop, d13 41 tomato, d14 5 star, d15 5 star, d16-d20 ~41 spangle.
-    * SIG DIGIT WORKS: Takes 40 seconds with sig dig 2, 6 seconds with sig dig 1!
-    * Results changed, but trivially. The two days of 5 starfruits were replaced with more 41 spangles.
-    * Tree data structure: 0.2 seconds!
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -703,8 +697,7 @@
     // private double AvailableGold = 5000;
     // private int AvailableTiles = 0;
 
-    /* Test 4: Answer is D1 Bluberry, ie crop with highest TPI. Profit 2.6k. IM takes <1 second.
-    */
+    /* Test 4: Answer is D1 Bluberry, ie crop with highest TPI. Profit 2.6k. IM takes <1 second. */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("Hot Pepper", 5, 3, 40, 40),
@@ -759,7 +752,7 @@
     // private int AvailableTiles = 400;
 
     /* Test 7: Balanced TG 0.09
-    * Results: profit 109k. d1 450 wheat, d5 293 pep, d10 146 blue.
+    * Results: profit 112.5k. d1 450 wheat, d5 450 wheat, d9 450 rad, d15 450 melon.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -774,7 +767,7 @@
     // private int AvailableTiles = 450;
 
     /* Test 8: High TG 0.5
-    * PPI results: 51,000,000g. Schedule: D1 1m wheat, D6 250k wheat, D11 156k pep, D17 156k pep, D20 156k rad, D23 31k wheat
+    * Results: 64 million g. Schedule: d1 100k wheat, d5 250k wheat, d9 500k wheat, d13 344k pep, d18 156k rad, d24 156k wheat.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -794,6 +787,7 @@
     // private int AvailableTiles = 500000;
 
     /* Test 9: Very High TG 4.0
+     * Result: 22 million g. Schedule: d1 10k wheat, d5 25k wheat, d9 62.5k wheat, d13 156k wheat, d17 391k wheat, d21 244k rad.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -813,8 +807,7 @@
     // private int AvailableTiles = 400000;
 
      /* Test 10: Coral Island Spring Crops - Level E
-     * Set HarvestPayday to DayAfter!
-     * Correct answer: Potato/Radish/Cauli/Cauli, Profit is 4580 coins (bad answer is Cucumber, profit 4260)
+     * Result: 4580g profit. Schedule: potato, cauli, cauli, radish. (other website says potato/rad/cauli/cauli, but other combos be equivalent)
      */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -832,7 +825,7 @@
     // private double AvailableGold = 800;
     // private int AvailableTiles = 20;
 
-    /* Test 11: Infinite Gold. Result: most profitable fruit, like Starfruit. */
+    /* Test 11: Infinite Gold. Result: whatever the most profitable fruit is. Strawberry, Starfruit, or Sweet Gem Berry. */
 
     private static readonly string SpringName = "Spring";
     private static readonly string SummerName = "Summer";
