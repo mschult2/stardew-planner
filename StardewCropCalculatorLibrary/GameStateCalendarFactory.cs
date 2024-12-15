@@ -253,8 +253,6 @@ namespace StardewCropCalculatorLibrary
         private static readonly bool UseCache = true;
         // Optimization: max number of crops to include in schedule. Currently, 4 is the limit with 12 crops because there's 20k/2k-opt ops at 7 seconds. 5 would be 250k/100k-opt ops at 6 minutes!
         private static readonly int MaxNumCropTypes = 5;
-        // Optimization: which heuristic to use. A is taking top crop from each successive schedule, B is taking all the crops from each successive schedule. B has performed better.
-        private static readonly bool HeuristicA = false;
         // (Only matters for next-day Payday) If false, then return tiles as soon as crop is harvested, which is more realistic. And it helps with cases where we needed just *one more day* to make a sale.
         //    -> EXAMPLE: MikeFruit: 14, NA, 200, 400; Gold: 40,000; Tiles: 100; SeasonLength: 29, DayAfter. Profit is 40k instead of 20k, since we were only tile-limited and so had time to plant 1 more batch. 
         // However, holding onto those tiles until we get the next-day gold might be smarter in some cases...because what if we're in a very precise corner case where we are tile-limited, but only have enough
@@ -358,80 +356,95 @@ namespace StardewCropCalculatorLibrary
             startingTiles = availableTiles;
             Tuple<double, GameStateCalendar> wealth = Tuple.Create<double, GameStateCalendar>(0.0, null);
 
-            // PPI STRATEGY (use for heuristic)
-            bool runSim = true;
+            GameStateCalendar bestPpiCalendar = null;
+            double bestPpiWealth = 0;
+            string bestPpiIteration = null;
+
+            // STRATEGY 1: PPI TopCrop
             var localCrops = new List<Crop>(Crops);
-            var bestCrops = new HashSet<Crop>();
+
+            for (int i = 0; i < Crops.Count; ++i)
             {
-                var numIterations = Crops.Count;
+                if (localCrops.Count == 0)
+                    break;
 
-                for (int i = 0; i < numIterations; ++i)
+                GameStateCalendar ppiCalendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
+
+                GetBestSchedule_Strategy2(1, localCrops, ppiCalendar);
+                double ppiWealth = ppiCalendar.GameStates[NumDays + 1].Wallet;
+
+                // Save off best TopCrop scehdule
+                var plantBatchSequence = ppiCalendar.GetPlantSequence();
+                int uniqueCropsCount = plantBatchSequence.Select(x => x.CropType).Distinct().ToList().Count;
+                if (ppiWealth > bestPpiWealth)
                 {
-                    GameStateCalendar calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
+                    bestPpiCalendar = ppiCalendar;
+                    bestPpiWealth = ppiWealth;
+                    bestPpiIteration = $"~TopCrop Iteration {i}~";
+                }
 
-                    GetBestSchedule_Strategy2(1, localCrops, calendar);
+                // Remove top crop
+                var dayOnePlants = ppiCalendar.GameStates[1].Plants;
+                if (dayOnePlants != null && dayOnePlants.Count > 0 && dayOnePlants[0] != null && dayOnePlants[0].Count > 0 && localCrops.Count > 0 && localCrops.Contains(dayOnePlants[0].CropType))
+                    localCrops.Remove(dayOnePlants[0].CropType);
+            }
 
-                    // Heuristic A: take top crop from best schedule
-                    if (HeuristicA)
+            // STRATEGY 2 - PPI AllCrop
+            localCrops = new List<Crop>(Crops);
+            var bestCrops = new HashSet<Crop>();
+
+            for (int i = 0; i < Crops.Count; ++i)
+            {
+                if (localCrops.Count == 0)
+                    break;
+
+                GameStateCalendar ppiCalendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
+
+                GetBestSchedule_Strategy2(1, localCrops, ppiCalendar);
+                double ppiWealth = ppiCalendar.GameStates[NumDays + 1].Wallet;
+
+                // Save off best AllCrop scehdule
+                var plantBatchSequence = ppiCalendar.GetPlantSequence();
+                int uniqueCropsCount = plantBatchSequence.Select(x => x.CropType).Distinct().ToList().Count;
+                if (ppiWealth > bestPpiWealth)
+                {
+                    bestPpiCalendar = ppiCalendar;
+                    bestPpiWealth = ppiWealth;
+                    bestPpiIteration = $"~AllCrop Iteration {i}~";
+                }
+
+                if (plantBatchSequence.Count > 0)
+                {
+                    for (int plantIndex = 0; plantIndex < plantBatchSequence.Count; ++plantIndex)
                     {
+                        var cropToAdd = plantBatchSequence[plantIndex].CropType;
+                        localCrops.Remove(cropToAdd);
 
-                        var dayOnePlants = calendar.GameStates[1].Plants;
-                        if (bestCrops.Count < numCropTypes && dayOnePlants != null && dayOnePlants.Count > 0 && dayOnePlants[0] != null && dayOnePlants[0].Count > 0 && localCrops.Count > 0 && localCrops.Contains(dayOnePlants[0].CropType))
-                        {
-                            var topCrop = dayOnePlants[0].CropType;
-                            localCrops.Remove(topCrop);
-                            bestCrops.Add(topCrop);
-                        }
-                        // Short-circuit this strategy if we're only using it to obtain a heuristic
-                        else
-                            break;
-                    }
-                    // Heuristic B: take all crops from best schedule
-                    else
-                    {
-                        var plantBatchSequence = calendar.GetPlantSequence();
-
-                        // If PPI schedule has more crops than Sim, then we're kind of limiting ourself. So take PPI instead since it generally seems more profitable in this case.
-                        int uniqueCropsCount = plantBatchSequence.Select(x => x.CropType).Distinct().ToList().Count;
-
-                        if (i == 0 && uniqueCropsCount > numCropTypes)
-                        {
-                            Console.WriteLine($"Using PPI schedule, since it has more crops than Sim.");
-                            wealth = Tuple.Create(calendar.GameStates[NumDays + 1].Wallet, calendar);
-                            runSim = false;
-                            break;
-                        }
-
-                        if (bestCrops.Count < numCropTypes && plantBatchSequence.Count > 0)
-                        {
-                            for (int plantIndex = 0; plantIndex < plantBatchSequence.Count; ++plantIndex)
-                            {
-                                var cropToAdd = plantBatchSequence[plantIndex].CropType;
-                                bestCrops.Add(cropToAdd);
-                                localCrops.Remove(cropToAdd);
-
-                                if (bestCrops.Count >= numCropTypes)
-                                    break;
-                            }
-                        }
-                        // Short-circuit this strategy if we're only using it to obtain a heuristic
-                        else
-                            break;
+                        if (bestCrops.Count < numCropTypes)
+                            bestCrops.Add(cropToAdd);
                     }
                 }
+                else
+                    break;
             }
 
             if (bestCrops.Count < numCropTypes && bestCrops.Count < Crops.Count)
-                Console.WriteLine($"WARNING: Top crop list wasn't as long as it's supposed to be. Length {bestCrops.Count} instead of {numCropTypes}");
+                Console.WriteLine($"WARNING: Best crop list wasn't as long as it's supposed to be. Length {bestCrops.Count} instead of {numCropTypes}.");
 
-            // SIMULATION STRATEGY
-            if (runSim)
+            // STRATEGY 3: Sim + PPI AllCrop heuristic
             {
                 var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
                 daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, bestCrops.ToList(), calendar));
 
                 wealth = await GetBestSchedule_Strategy1();
+            }
+
+            // Take whichever strategy is best
+            if (bestPpiWealth > wealth.Item1)
+            {
+                Console.WriteLine($"Using PPI schedule {bestPpiIteration} since it's better than Sim.");
+                wealth = Tuple.Create(bestPpiWealth, bestPpiCalendar);
             }
 
             // Modify answer to be profit instead of wealth
