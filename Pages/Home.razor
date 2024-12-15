@@ -661,6 +661,8 @@
     private double AvailableGold = 5000;
     private int AvailableTiles = 100;
 
+    /* Test 0: Infinite Gold. Result: whatever the most profitable fruit is. Strawberry, Starfruit, or Sweet Gem Berry. */
+
     /* Test 1: Infinite Tiles (ROI)
      * Answer is a bunch of peps, D16 melon, then a bunch of peps. Profit 235.6k. */
     // private static readonly List<Crop> DefaultCrops = new()
@@ -825,7 +827,22 @@
     // private double AvailableGold = 800;
     // private int AvailableTiles = 20;
 
-    /* Test 11: Infinite Gold. Result: whatever the most profitable fruit is. Strawberry, Starfruit, or Sweet Gem Berry. */
+    /* MultiCrop Test: set MultiCrop true */
+    // private static readonly List<Crop> DefaultCrops = new()
+    // {
+    //     new Crop("CI Radish", 6, 1000, 60, 108),
+    //     new Crop("CI Cauliflower", 8, 1000, 70, 140),
+    //     new Crop("CI Potato", 5, 1000, 25, 66),
+    //     new Crop("CI Carrot", 7, 1000, 35, 70),
+    //     new Crop("CI Soybean", 7, 4, 20, 15),
+    //     new Crop("CI Pea", 11, 4, 45, 50),
+    //     new Crop("CI Cucumber", 9, 3, 25, 34),
+    //     new Crop("CI Poppy", 7, 1000, 30, 72),
+    //     new Crop("CI Daisy", 4, 1000, 15, 35),
+    //     new Crop("CI Turnip", 4, 1000, 15, 35),
+    // };
+    // private double AvailableGold = 1000;
+    // private int AvailableTiles = 20;
 
     private static readonly string SpringName = "Spring";
     private static readonly string SummerName = "Summer";

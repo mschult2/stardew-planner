@@ -264,6 +264,8 @@ namespace StardewCropCalculatorLibrary
         private static readonly bool ReturnTilesAsap = false;
         // Memory threshold in GB. Necessary because browser tabs only allow WebAssembly apps to use 2 GB of memory. (Javascript is 4 GB)
         private static readonly double MemoryThreshold = 1.38;
+        // Allow the planting of multiple crops on the same day.
+        private static readonly bool MultiCrop = false;
 
         private int NumDays;
 
@@ -549,7 +551,8 @@ namespace StardewCropCalculatorLibrary
                             UpdateCalendar_HoldTiles(thisCropCalendar, unitsToPlant, crop, day, numDays);
 
                         // Queue up updating game state based on subsequent purchases.
-                        for (int j = day + 1; j <= numDays; ++j)
+                        int nextDay = MultiCrop ? day : day + 1;
+                        for (int j = nextDay; j <= numDays; ++j)
                         {
                             // Be careful with increasing the threshold. In a past implementation, it counter-intuitively increased the state space from 2000 to 6000. In another implementation, it made the results incorrect.
                             //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(thisCropCalendar.GameStates[j]), goldLowerLimit);
@@ -637,6 +640,8 @@ namespace StardewCropCalculatorLibrary
                         if (harvestDay <= NumDays)
                             daysOfInterest.Add(harvestDay + PaydayDelay);
                     }
+
+                    day = MultiCrop ? day - 1 : day;
                 }
             }
 
