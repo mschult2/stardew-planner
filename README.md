@@ -1,4 +1,4 @@
-A Blazor web app that approximates the most profitable planting schedule in Stardew Valley, based on available gold, field tiles, crops, starting day, and season length. Applicable to a number of farming games: Harvest Moon, Story of Seasons, Harvestella, Fields of Mistria, Rune Factory, etc.
+A Blazor WASM web app that approximates the most profitable planting schedule in Stardew Valley, based on available gold, field tiles, crops, starting day, and season length. Applicable to a number of farming games: Harvest Moon, Story of Seasons, Harvestella, Fields of Mistria, Rune Factory, etc.
 
 The algorithm is a heuristic decision tree simulation, with caching and bucketing optimizations.
 
