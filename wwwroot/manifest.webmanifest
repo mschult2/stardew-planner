@@ -1,12 +1,14 @@
 {
-  "name": "CropPlanner",
-  "short_name": "CropPlanner",
+  "name": "Crop Planner",
+  "short_name": "Crop Planner",
   "id": "./",
   "start_url": "./",
+  "description": "Generate optimal planting schedule for farm sims like Stardew Valley and Coral Island.",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#03173d",
   "prefer_related_applications": false,
+  "categories": [ "utilities", "games", "simulation" ],
   "icons": [
     {
       "src": "icon-512.png",
@@ -17,6 +19,11 @@
       "src": "icon-192.png",
       "type": "image/png",
       "sizes": "192x192"
+    },
+    {
+      "src": "maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
     }
   ]
 }
