@@ -1,6 +1,8 @@
 ﻿@page "/"
-<PageTitle>Stardew Valley Crop Planner</PageTitle>
+
 @using StardewCropCalculatorLibrary
+
+<PageTitle>Stardew Valley Crop Planner</PageTitle>
 
 <h2>Planting Schedule Generator</h2>
 
@@ -141,7 +143,7 @@
             Same Day
             <input type="radio" style="margin-left: 40px;" checked="@(SameDay == false)" @onchange="@(() => UpdateSameDay(false))" />
             Day After
-            <span style ="margin-left: 53px;">(Replant: same day VS the day after)</span>
+            <span style="margin-left: 53px;">(Replant: same day VS the day after)</span>
         </div>
     </form>
 </div>
@@ -149,7 +151,7 @@
 <br />
 
 <div>
- @*    <h4>Planting Schedule</h4> *@
+    @*    <h4>Planting Schedule</h4> *@
 
     <!-- Generate Schedule button -->
     <button disabled="@(IsBusy)" @onclick="GenerateCalendar" class="big-button">Generate Schedule!</button>
@@ -158,37 +160,37 @@
     <div>
         @if (Schedule != null)
         {
-                <div class="calendar-container">
+            <div class="calendar-container">
 
-                    <!-- Profit -->
-                    <div class="profit-overlay">
-                        @if (Profit >= 0 && Schedule != null)
-                        {
+                <!-- Profit -->
+                <div class="profit-overlay">
+                    @if (Profit >= 0 && Schedule != null)
+                    {
                         <p><strong>Profit: @Profit.ToString("N0") gold</strong></p>
-                        }
-                        else if (Profit == -2)
-                        {
-                            <p><strong>Error: out of memory</strong></p>
-                        }
-                        else
-                        {
-                            <p><strong>Profit: N/A</strong></p>
-                        }
+                    }
+                    else if (Profit == -2)
+                    {
+                        <p><strong>Error: out of memory</strong></p>
+                    }
+                    else
+                    {
+                        <p><strong>Profit: N/A</strong></p>
+                    }
 
-                        @if (InvestmentMultiplier >= 0 && Schedule != null)
-                        {
-                            <p><strong>@($"ROI: {((InvestmentMultiplier - 1) * 100).ToString("N0")}%")</strong></p>
-                        }
-                        else if (Profit == -2)
-                        {
-                        }
-                        else
-                        {
-                            <p><strong>ROI: N/A</strong></p>
-                        }
-                    </div>
+                    @if (InvestmentMultiplier >= 0 && Schedule != null)
+                    {
+                        <p><strong>@($"ROI: {((InvestmentMultiplier - 1) * 100).ToString("N0")}%")</strong></p>
+                    }
+                    else if (Profit == -2)
+                    {
+                    }
+                    else
+                    {
+                        <p><strong>ROI: N/A</strong></p>
+                    }
+                </div>
 
-                    <table class="calendar-table">
+                <table class="calendar-table">
                     <thead>
                         <tr>
                             <th>Monday</th>
@@ -249,15 +251,15 @@
                     </tbody>
                 </table>
 
-                    <!-- Spinner Overlay -->
-                    @if (IsBusy)
-                    {
-                        <div class="calendar-overlay">
-                            <div class="spinner"></div>
-                            <p style="font-size: 1.25em;" >Running simulation... Please wait up to 30 seconds</p>
-                        </div>
-                    }
-                </div>
+                <!-- Spinner Overlay -->
+                @if (IsBusy)
+                {
+                    <div class="calendar-overlay">
+                        <div class="spinner"></div>
+                        <p style="font-size: 1.25em;">Running simulation... Please wait up to 30 seconds</p>
+                    </div>
+                }
+            </div>
         }
         else
         {
@@ -283,7 +285,7 @@
 
         .primary-button:hover {
             background-color: #0a65ad;
-    }
+        }
 
     .big-button {
         background-color: #2196f3; /* Blue */
@@ -441,12 +443,15 @@
         .crop-item.spring {
             color: #2E8B57;
         }
+
         .crop-item.summer {
             color: #DAA520;
         }
+
         .crop-item.fall {
             color: #D2691E;
         }
+
         .crop-item.winter {
             color: #4682B4;
         }
@@ -548,9 +553,14 @@
     }
 
     @@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
 
 </style>
 
@@ -808,9 +818,9 @@
     // private double AvailableGold = 100000;
     // private int AvailableTiles = 400000;
 
-     /* Test 10: Coral Island Spring Crops - Level E
-     * Result: 4580g profit. Schedule: potato, cauli, cauli, radish. (other website says potato/rad/cauli/cauli, but other combos be equivalent)
-     */
+    /* Test 10: Coral Island Spring Crops - Level E
+    * Result: 4580g profit. Schedule: potato, cauli, cauli, radish. (other website says potato/rad/cauli/cauli, but other combos be equivalent)
+    */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("CI Radish", 6, 1000, 60, 108),
