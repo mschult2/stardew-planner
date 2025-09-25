@@ -173,6 +173,39 @@ namespace StardewCropCalculatorLibrary
             return name;
         }
 
+        public string Serialize()
+        {
+            return $"{name};{buyPrice};{sellPrice};{timeToMaturity};{yieldRate};{Season};{SecondSeason};{IsEnabled}";
+        }
+
+        public static Crop Deserialize(string serialized)
+        {
+            var cropParts = serialized.Split(';');
+
+            var name = cropParts[0];
+            var buyPrice = double.Parse(cropParts[1]);
+            var sellPrice = double.Parse(cropParts[2]);
+            var timeToMaturity = int.Parse(cropParts[3]);
+            var yieldRate = int.Parse(cropParts[4]);
+            var season = cropParts[5];
+            var secondSeason = cropParts[6];
+            var isEnabled = bool.Parse(cropParts[7]);
+
+            return new Crop(name, timeToMaturity, yieldRate, buyPrice, sellPrice, isEnabled, season, secondSeason);
+        }
+
+        public static string SerializeCrops(IEnumerable<Crop> crops)
+        {
+            return string.Join("\n", crops.Select(c => c.Serialize()));
+        }
+
+        public static IEnumerable<Crop> DeserializeCrops(string serializedCrops)
+        {
+            return serializedCrops
+                .Split(['\n'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => Deserialize(line));
+        }
+
         ///// <summary>
         ///// Per-tile profitability index. How profitable a tile is, if we only plant this crop on it the entire month.
         /////

@@ -1,17 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Threading;
-using System.Security.Claims;
-using System.Data.SqlTypes;
-using System.Collections;
 
 namespace StardewCropCalculatorLibrary
 {
+    public static class QueueExtensions
+    {
+        public static void EnqueueRange<T>(this Queue<T> queue, IEnumerable<T> items)
+        {
+            foreach (var item in items)
+            {
+                queue.Enqueue(item);
+            }
+        }
+    }
+
     /// <summary> The state of our farm on every day. Includes the day after the last day of the season, since we still get paid on that day. </summary>
     public class GameStateCalendar
     {
@@ -73,27 +79,106 @@ namespace StardewCropCalculatorLibrary
         }
 
         /// <summary>
-        /// Clone input calendar. Input range is deep copy that is safe to modify. The other days are read-only shallow copies.
+        /// Deserialize GameStateCalendar.
+        /// Days before the first listed are omitted for perf reasons.
+        /// Plants are omitted for perf reasions.
+        /// </summary>
+        public GameStateCalendar(int numDays, Dictionary<string, Crop> cropDictonary, string serializedCalendar)
+        {
+            NumDays = numDays;
+
+            string[] lines = serializedCalendar.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var daysOfInterest = new Dictionary<int, GameState>();
+            int firstDay = 1;
+            bool haveFirstDay = false;
+
+            foreach (var line in lines)
+            {
+                // Each line is: day_wallet_freeTiles
+                var parts = line.Split('_');
+
+                int day = int.Parse(parts[0]);
+                double wallet = double.Parse(parts[1]);
+                int freeTiles = int.Parse(parts[2]);
+
+                if (!haveFirstDay)
+                {
+                    haveFirstDay = true;
+                    firstDay = day;
+                }
+
+                // Create GameState
+                daysOfInterest[day] = new GameState() { Wallet = wallet, FreeTiles = freeTiles, DayOfInterest = true };
+
+                // Append plant list to GameState
+                string serializedPlantBatches = parts[3];
+                if (!string.IsNullOrWhiteSpace(serializedPlantBatches))
+                {
+                    var plantBatchesParts = serializedPlantBatches.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries);
+
+                    foreach (var serializedPlantBatch in plantBatchesParts)
+                    {
+                        var plantBatchParts = serializedPlantBatch.Split(';');
+
+                        string cropName = plantBatchParts[0];
+                        int cropCount = int.Parse(plantBatchParts[1]);
+                        int plantDay = int.Parse(plantBatchParts[2]);
+
+                        daysOfInterest[day].Plants.Add(new PlantBatch(cropDictonary[cropName], cropCount, plantDay, numDays));
+                    }
+                }
+            }
+
+            double lastWallet = 0;
+            int lastTiles = 0;
+            var lastPlants = new List<PlantBatch>();
+
+            for (int i = firstDay; i <= numDays + 1; ++i)
+            {
+                if (daysOfInterest.TryGetValue(i, out var dayOfInterest))
+                {
+                    GameStates.Add(i, dayOfInterest);
+                    lastWallet = dayOfInterest.Wallet;
+                    lastTiles = dayOfInterest.FreeTiles;
+                    lastPlants = dayOfInterest.Plants;
+                }
+                else
+                {
+                    GameStates.Add(i, new GameState());
+                    GameStates[i].Wallet = lastWallet;
+                    GameStates[i].FreeTiles = lastTiles;
+
+                    foreach (var curLastPlant in lastPlants)
+                        GameStates[i].Plants.Add(curLastPlant);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clone input calendar. Input range is deep copy that is safe to modify. The other days are omitted.
         /// </summary>
         /// <param name="otherCalendar">Input calendar to copy.</param>
         /// <param name="startingDay">Use 1 to start at beginning of season.</param>
         /// <param name="endingDay">Use 0 to go to end of season.</param>
-        public GameStateCalendar(GameStateCalendar otherCalendar, int startingDay, int endingDay)
+        public GameStateCalendar(GameStateCalendar otherCalendar, int startingDay, int endingDay, bool deep = true)
         {
             NumDays = otherCalendar.NumDays;
 
             // Deep copy of indicated range
-            for (int i = startingDay; i <= endingDay; ++i)
-                GameStates.Add(i, new GameState());
-
-            Merge(otherCalendar, startingDay, endingDay);
-
-            // Shallow copy of other range
-            for (int i = 1; i <= NumDays + 1; ++i)
+            if (deep)
             {
-                if (i < startingDay || i > endingDay)
-                    GameStates.Add(i, otherCalendar.GameStates[i]);
+                for (int i = startingDay; i <= endingDay; ++i)
+                    GameStates.Add(i, new GameState());
             }
+
+            Merge(otherCalendar, startingDay, endingDay, deep);
+
+            //// Shallow copy of other range
+            //for (int i = 1; i <= NumDays + 1; ++i)
+            //{
+            //    if (i < startingDay || i > endingDay)
+            //        GameStates.Add(i, otherCalendar.GameStates[i]);
+            //}
         }
 
         /// <summary>
@@ -103,21 +188,28 @@ namespace StardewCropCalculatorLibrary
         /// <param name="otherCalendar">The calendar to copy</param>
         /// <param name="startingDay">The day to copy from. Default is 1.</param>
         /// <param name="endingDay">The day to end copying on. Default is day after the last day of the season.</param>
-        public void Merge(GameStateCalendar otherCalendar, int startingDay = 1, int endingDay = 0)
+        public void Merge(GameStateCalendar otherCalendar, int startingDay = 1, int endingDay = 0, bool deep = true)
         {
             if (endingDay == 0)
                 endingDay = NumDays + 1;
 
             for (int i = startingDay; i <= endingDay; ++i)
             {
-                GameStates[i].Wallet = otherCalendar.GameStates[i].Wallet;
-                GameStates[i].FreeTiles = otherCalendar.GameStates[i].FreeTiles;
-                GameStates[i].DayOfInterest = otherCalendar.GameStates[i].DayOfInterest;
+                if (deep)
+                {
+                    GameStates[i].Wallet = otherCalendar.GameStates[i].Wallet;
+                    GameStates[i].FreeTiles = otherCalendar.GameStates[i].FreeTiles;
+                    GameStates[i].DayOfInterest = otherCalendar.GameStates[i].DayOfInterest;
 
-                GameStates[i].Plants.Clear();
+                    GameStates[i].Plants.Clear();
 
-                foreach (PlantBatch otherPlantBatch in otherCalendar.GameStates[i].Plants)
-                    GameStates[i].Plants.Add(new PlantBatch(otherPlantBatch));
+                    foreach (PlantBatch otherPlantBatch in otherCalendar.GameStates[i].Plants)
+                        GameStates[i].Plants.Add(new PlantBatch(otherPlantBatch));
+                }
+                else
+                {
+                    GameStates[i] = otherCalendar.GameStates[i];
+                }
             }
         }
 
@@ -144,6 +236,32 @@ namespace StardewCropCalculatorLibrary
             }
 
             return newCalendar;
+        }
+
+        public override string ToString()
+        {
+            StringBuilder sb = new();
+
+            foreach (var gameStatePair in GameStates)
+            {
+                var day = gameStatePair.Key;
+                var gameState = gameStatePair.Value;
+
+                sb.Append($"Day {day}: {gameState.Plants.Count} plants, {gameState.Wallet}g  ");
+
+                sb.Append('(');
+                for (int plantIndex = 0; plantIndex < gameState.Plants.Count; ++plantIndex)
+                {
+                    if (plantIndex > 0)
+                        sb.Append('-');
+
+                    var plant = gameState.Plants[plantIndex];
+                    sb.Append($"{plant.Count} {plant.CropType}; {plant.PlantDay}");
+                }
+                sb.AppendLine(")");
+            }
+
+            return sb.ToString();
         }
     }
 
@@ -226,31 +344,36 @@ namespace StardewCropCalculatorLibrary
     /// </summary>
     public class GameStateCalendarFactory
     {
-        private class GetMostProfitableCropArgs
+        public class GetMostProfitableCropArgs
         {
             public int Day;
-            public double GoldLowerLimit;
             public GameStateCalendar Calendar;
-            public List<Crop> Crops;
 
-            public GetMostProfitableCropArgs(int day, double goldLowerLimit, List<Crop> crops, GameStateCalendar calendar)
+            public GetMostProfitableCropArgs(int day, GameStateCalendar calendar)
             {
                 Day = day;
-                GoldLowerLimit = goldLowerLimit;
                 Calendar = calendar;
-                Crops = crops;
             }
         }
 
-        // GameState cache
-        private readonly Dictionary<string, Tuple<double, GameStateCalendar>> answerCache = new Dictionary<string, Tuple<double, GameStateCalendar>>();
+        /// <summary> Algorithm used to process simulation tree (in strategy 1). </summary>
+        private enum ProcessorAlgorithm
+        {
+            /// <summary> Normal: process each node sequentially. </summary>
+            Sequential = 0,
+            /// <summary> Process nodes in parallel to receive the next level of children nodes. </summary>
+            ParallelShallow = 1,
+            /// <summary> Process nodes in parallel, the entire subtree, to receive the corresponding best leaf node. </summary>
+            ParallelDeep = 2,
+        }
+
         // Gold pruning: if gold is quite low we ignore it, to simplify the schedule. Expressed as fraction of starting gold. 0 means we process any amount of gold, and 1 means we ignore an amount equal to the starting gold.
         private static readonly double GoldInvestmentThreshold = 0.5;
         private static readonly double TileInvestmentThresold = 0.07;
         // Used to bucket cache results.
         private static readonly int SignificantDigits = 2;
-        // Optimization: cache completed (best?) schedules.
-        private static readonly bool UseCache = true;
+        // Optimization: cache computed nodes.
+         private static readonly bool UseCache = true;
         // Optimization: max number of crops to include in schedule. Currently, 4 is the limit with 12 crops because there's 20k/2k-opt ops at 7 seconds. 5 would be 250k/100k-opt ops at 6 minutes!
         private static readonly int MaxNumCropTypes = 5;
         // (Only matters for next-day Payday) If false, then return tiles as soon as crop is harvested, which is more realistic. And it helps with cases where we needed just *one more day* to make a sale.
@@ -262,21 +385,26 @@ namespace StardewCropCalculatorLibrary
         //       This situation occurs because we were tile-limited, but the gold-limit was so close behind we couldn't afford the better fruit.
         // Summary: Answer is also a little worse for test 10 Coral Island when using DayAfter. For that reason I won't enable it. I mean the user has to enable DayAfter, so really we should respect their choice.
         private static readonly bool ReturnTilesAsap = false;
-        // Memory threshold in GB. Necessary because browser tabs only allow WebAssembly apps to use 2 GB of memory. (Javascript is 4 GB)
-        private static readonly double MemoryThreshold = 1.38;
         // Allow the planting of multiple crops on the same day.
-        private static readonly bool MultiCrop = false;
+        private static readonly bool MultiCrop = true;
+        // Delegate computation to external processor.
+        private static readonly ProcessorAlgorithm Algorithm = ProcessorAlgorithm.ParallelDeep;
+
+        // When using the Deep processor, this is the number of nodes created by the Direct processor first.
+        private static readonly int DeepProcessor_NumSeeds = 120;
+
+        private readonly Yielder yielder = new();
+        private readonly ICalendarProcessor processor;
+
+        // GameState cache
+        //private readonly Dictionary<string, (double Wealth, GameStateCalendar Calendar)> answerCache = [];
+        private readonly HashSet<string> nodeCache = [];
 
         private int NumDays;
-
         private int StartDay;
-
-        private readonly List<Crop> Crops = new List<Crop>();
+        private List<Crop> Crops = [];
 
         private Queue<GetMostProfitableCropArgs> daysToEvaluate = new Queue<GetMostProfitableCropArgs>(3000);
-
-        private int numOperationsStat = 0;
-        private int numCacheHitsStat = 0;
 
         private int startingTiles = 0;
         private double startingGold = 0;
@@ -288,39 +416,36 @@ namespace StardewCropCalculatorLibrary
         /// </summary>
         public static int PaydayDelay { get; set; } = 0;
 
-        /// <summary>
-        /// Configure the scheduler.
-        /// </summary>
-        /// <param name="startingDay">Which day to start on - can be anywhere from 1 - numDays.</param>
-        /// <param name="numDays">Number of days in the season.</param>
-        /// <param name="crops"></param>
-        public GameStateCalendarFactory(int numDays, List<Crop> crops, int startDay)
+        public GameStateCalendarFactory(ICalendarProcessor processor)
         {
-            if (startDay < 1 || startDay >= numDays)
+            this.processor = processor;
+            processor.InitializeAsync();
+        }
+
+        /// <summary>
+        /// Return the optimial schedule.
+        /// Only run one at a time!
+        /// </summary>
+        public async Task<Tuple<double, GameStateCalendar>> GetBestSchedule(List<Crop> crops, int startDay, int totalDays, int availableTiles, double availableGold)
+        {
+            // Validate inputs
+            if (startDay < 1 || startDay >= totalDays)
                 throw new Exception($"Starting day was invalid: {startDay}");
 
+            // Initialize
             StartDay = startDay;
-            NumDays = numDays - startDay + 1;
+            NumDays = totalDays - startDay + 1;
             Crops = crops.Where(c => c.IsEnabled).ToList();
 
-            // Find cheapest crop
             if (Crops != null && Crops.Count > 0)
             {
                 cheapestCrop = Crops[0];
                 foreach (var crop in Crops)
                     cheapestCrop = crop.buyPrice < cheapestCrop.buyPrice ? crop : cheapestCrop;
             }
-        }
 
-        /// <summary>
-        /// Return the optimial schedule.
-        /// </summary>
-        public async Task<Tuple<double, GameStateCalendar>> GetBestSchedule(int availableTiles, double availableGold)
-        {
-            answerCache.Clear();
+            nodeCache.Clear();
             daysToEvaluate.Clear();
-            numOperationsStat = 0;
-            numCacheHitsStat = 0;
             int numCropTypes = MaxNumCropTypes;
 
             bool infiniteGold = false;
@@ -437,9 +562,9 @@ namespace StardewCropCalculatorLibrary
             {
                 var calendar = new GameStateCalendar(NumDays, availableTiles, availableGold);
 
-                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, cheapestCrop.buyPrice, bestCrops.ToList(), calendar));
+                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(1, calendar));
 
-                wealth = await GetBestSchedule_Strategy1();
+                wealth = await GetBestSchedule_Strategy1(bestCrops);
             }
 
             // Take whichever strategy is best
@@ -463,13 +588,11 @@ namespace StardewCropCalculatorLibrary
                 wealth = Tuple.Create(wealth.Item1, shiftedCalendar);
             }
 
-            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
+            yielder.CheckMemoryLimit();
 
             // Clean up
-            answerCache.Clear();
+            nodeCache.Clear();
             daysToEvaluate.Clear();
-            numOperationsStat = 0;
-            numCacheHitsStat = 0;
 
             return wealth;
         }
@@ -480,114 +603,207 @@ namespace StardewCropCalculatorLibrary
         /// Algorithm is a complete state space simulation with various optimizations.
         /// Very memory and CPU intensive.
         /// </summary>
-        private async Task<Tuple<double, GameStateCalendar>> GetBestSchedule_Strategy1()
+        private async Task<Tuple<double, GameStateCalendar>> GetBestSchedule_Strategy1(IEnumerable<Crop> crops)
         {
+            Console.WriteLine($"[GSCF] Using algorithm {Algorithm}");
+
+            // Outputs
             double bestWealth = 0;
             GameStateCalendar bestCalendar = null;
 
-            // Evaluate all possible schedules.
-            // Use a breadth-first approach with the game state tree.
+            if (Algorithm > 0)
+                await processor.ConfigureAsync(startingGold, startingTiles, NumDays, cheapestCrop.buyPrice, crops);
+
+            ProcessorAlgorithm currentAlgorithm = Algorithm == ProcessorAlgorithm.ParallelDeep ? ProcessorAlgorithm.Sequential : Algorithm;
+
+            // Stats
+            Stopwatch debugStopwatch = Stopwatch.StartNew();
+            yielder.OperationCount = 0;
+            yielder.CacheHitCount = 0;
+
             while (daysToEvaluate.Count > 0)
             {
-                await Task.Yield();
+                // If using Subtree Method, first use Direct Method for a few iterations to get some good subtree options.
+                if (currentAlgorithm != Algorithm)
+                    currentAlgorithm = daysToEvaluate.Count >= DeepProcessor_NumSeeds ? ProcessorAlgorithm.ParallelDeep : ProcessorAlgorithm.Sequential;
 
-                // Cancel operation and garbage-collect if above memory limit.
-                if (numOperationsStat % 500 == 0 && CheckMemoryLimit())
+                List<GetMostProfitableCropArgs> inputNodes;
+                IEnumerable<(int InputIndex, GetMostProfitableCropArgs Node)> groupedOutputNodes;
+
+                // Subtree Method: process one node all the way down.
+                if (currentAlgorithm == ProcessorAlgorithm.ParallelDeep)
                 {
-                    Console.WriteLine($"Error: canceled schedule generation due to high memory usage.");
-
-                    answerCache.Clear();
+                    inputNodes = [.. daysToEvaluate];
                     daysToEvaluate.Clear();
 
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers(); // Ensures finalizers are run
-                    GC.Collect(); // Collects again to free objects finalized in the first pass
+                    groupedOutputNodes = await processor.ProcessAsync_Deep(inputNodes);
 
-                    return Tuple.Create(-2.0, new GameStateCalendar(NumDays, startingTiles, startingGold));
+                    // Exit if excessive memory usage.
+                    if (groupedOutputNodes is null)
+                        return MemoryFailure();
+
+                    yielder.OperationCount += processor.LastNodesProcessed;
+                    yielder.CacheHitCount += processor.LastCacheHitsProcessed;
                 }
-
-                var args = daysToEvaluate.Dequeue();
-                var day = args.Day;
-                var goldLowerLimit = args.GoldLowerLimit;
-                GameStateCalendar todaysCalendar = args.Calendar;
-                var crops = args.Crops;
-
-                int numDays = todaysCalendar.NumDays;
-                int availableTiles = todaysCalendar.GameStates[day].FreeTiles;
-                double availableGold = todaysCalendar.GameStates[day].Wallet;
-                string serializedInputGameState = SerializeGameStateCalendar(todaysCalendar, day);
-
-                // Check cache for quick answer
-                if (UseCache && answerCache.TryGetValue(serializedInputGameState, out var wealthSchedulePair))
+                // Frontier Method: process all nodes in level.
+                else if (currentAlgorithm == ProcessorAlgorithm.ParallelShallow)
                 {
-                    ++numCacheHitsStat;
-                    continue;
+                    inputNodes = [.. daysToEvaluate];
+                    daysToEvaluate.Clear();
+
+                    IEnumerable<(int Day, string SerCal)> serInputNodes = inputNodes.Select(node => (node.Day, SerializeGameStateCalendar(node.Calendar, node.Day)));
+
+                    groupedOutputNodes = await processor.ProcessAsync_Shallow(serInputNodes);
+
+                    // Exit if excessive memory usage.
+                    if (groupedOutputNodes is null)
+                        return MemoryFailure();
+
+                    yielder.OperationCount += inputNodes.Count;
+                    yielder.CacheHitCount += processor.LastCacheHitsProcessed;
                 }
-
-                ++numOperationsStat;
-
-                foreach (var crop in crops)
+                // Direct Method: process one node.
+                else
                 {
-                    bool thisCropScheduleCompleted = true;
+                    // Exit if excessive memory usage.
+                    if (yielder.CheckMemoryLimit())
+                        return MemoryFailure();
 
-                    // Tree data structure: make shallow read-only copy of previous days, and deep copy of current and future days since we mean to modify them.
-                    GameStateCalendar thisCropCalendar = new GameStateCalendar(todaysCalendar, startingDay: day, endingDay: numDays + 1);
+                    // Yield back to renderer so page doesn't freeze.
+                    await yielder.Yield();
 
-                    // Calculate number of units to plant.
-                    int unitsCanAfford = crop.buyPrice != 0 ? ((int)(availableGold / crop.buyPrice)) : int.MaxValue;
-                    bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
-                    int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
+                    var inputNode = daysToEvaluate.Dequeue();
+                    inputNodes = [inputNode];
+                    yielder.OperationCount += inputNodes.Count;
 
-                    // Short-circuit number of units if too close to end of month for it to make money.
-                    if ((day + crop.timeToMaturity > numDays) || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
-                        unitsToPlant = 0;
+                    // Serialize input node.
+                    (int Day, string SerCal) serInputNode = (inputNode.Day, SerializeGameStateCalendar(inputNode.Calendar, inputNode.Day));
 
-                    if (unitsToPlant > 0)
+                    // Check cache if node has been explored before.
+                    if (UseCache && nodeCache.Contains(serInputNode.SerCal))
                     {
-                        // Update game state based on the current purchase.
-                        if (ReturnTilesAsap)
-                            UpdateCalendar(thisCropCalendar, unitsToPlant, crop, day, numDays);
-                        else
-                            UpdateCalendar_HoldTiles(thisCropCalendar, unitsToPlant, crop, day, numDays);
-
-                        // Queue up updating game state based on subsequent purchases.
-                        int nextDay = MultiCrop ? day : day + 1;
-                        for (int j = nextDay; j <= numDays; ++j)
-                        {
-                            // Be careful with increasing the threshold. In a past implementation, it counter-intuitively increased the state space from 2000 to 6000. In another implementation, it made the results incorrect.
-                            //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(thisCropCalendar.GameStates[j]), goldLowerLimit);
-                            //if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
-                            if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && thisCropCalendar.GameStates[j].Wallet >= startingGold * GoldInvestmentThreshold
-                                && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0) && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > startingTiles * TileInvestmentThresold))
-                            {
-                                thisCropScheduleCompleted = false;
-                                daysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, 0, crops, thisCropCalendar));
-                                break;
-                            }
-                        }
-                    }
-                    else
-                        thisCropScheduleCompleted = true;
-
-                    // If no further action can be taken for all crops, then a schedule has been completed!
-                    if (thisCropScheduleCompleted)
-                    {
-                        double thisCropWealth = thisCropCalendar?.GameStates[NumDays + 1].Wallet ?? 0;
-
-                        if (thisCropWealth > bestWealth)
-                        {
-                            bestWealth = thisCropWealth;
-                            bestCalendar = thisCropCalendar;
-                        }
-
-                        if (!answerCache.ContainsKey(serializedInputGameState))
-                            answerCache[serializedInputGameState] = Tuple.Create(thisCropWealth, thisCropCalendar);
+                        ++yielder.CacheHitCount;
+                        continue;
                     }
 
-                } // Crops loop
-            } // daysToEvaluate loop
+                    // Process input node.
+                    var outputNodes = ProcessNode(serInputNode.Day, serInputNode.SerCal, cheapestCrop.buyPrice, startingGold, startingTiles, crops, NumDays);
+                    groupedOutputNodes = outputNodes.Select(node => (0, node));
+
+                    // Mark output node in cache.
+                    if (UseCache && serInputNode.SerCal != null && !nodeCache.Contains(serInputNode.SerCal))
+                        nodeCache.Add(serInputNode.SerCal);
+
+                    // Process entire level of nodes.
+                    //inputNodes = [.. daysToEvaluate];
+                    //daysToEvaluate.Clear();
+                    //List<(int InputIndex, GetMostProfitableCropArgs Node)> totalOutputNodes = [];
+                    //for (int i = 0; i < inputNodes.Count; ++i)
+                    //{
+                    //    (int Day, string SerCal) serInputNode = (inputNodes[i].Day, SerializeGameStateCalendar(inputNodes[i].Calendar, inputNodes[i].Day));
+                    //    var outputNodes = ProcessNode(serInputNode.Day, serInputNode.SerCal, cheapestCrop.buyPrice, startingGold, startingTiles, crops, NumDays);
+                    //    totalOutputNodes.AddRange(outputNodes.Select(node => (i, node)));
+                    //}
+                    //groupedOutputNodes = totalOutputNodes;
+                }
+
+                // Save output nodes.
+                foreach (var group in groupedOutputNodes.GroupBy(x => x.InputIndex))
+                {
+                    var inputNode = inputNodes[group.Key];
+
+                    foreach (var (InputIndex, OutputNode) in group)
+                    {
+                        // Merge output with input.
+                        if (inputNode.Day > 1)
+                            OutputNode.Calendar.Merge(inputNode.Calendar, startingDay: 1, endingDay: inputNode.Day - 1, deep: false);
+
+                        if (OutputNode.Calendar.Wealth > bestWealth)
+                        {
+                            bestWealth = OutputNode.Calendar.Wealth;
+                            bestCalendar = OutputNode.Calendar;
+                        }
+
+                        if (OutputNode.Day < NumDays)
+                            daysToEvaluate.Enqueue(OutputNode);
+                    }
+                }
+
+                //Console.WriteLine($"\n[GCSF] Nodes processed: {inputNodes.Count} / {debugNodeCount}.  Nodes in queue: {daysToEvaluate.Count},  Time: {debugStopwatch.Elapsed:mm\\:ss\\.f}");
+            }
+
+            processor.PrintStats();
+
+            Console.WriteLine($"\n    [GCSF] DONE!  Nodes processed: {yielder.OperationCount}. Cache hits: {yielder.CacheHitCount}.  Time: {debugStopwatch.Elapsed:mm\\:ss\\.f}.  Crops: {crops.Count()}");
+            Console.WriteLine($"    [GCSF] Crops: {string.Join(", ", crops)}\n");
 
             return Tuple.Create(bestWealth, bestCalendar);
+        }
+
+        internal static Queue<GetMostProfitableCropArgs> ProcessNode(int day, string serializedInputCalendar,
+            double cheapestCropBuyPrice, double startingGold, int startingTiles, IEnumerable<Crop> crops, int numDays)
+        {
+            // Deserialize input calendar once.
+            // Should use raw input calendar, but for some reason using the serialized version significantly reduces memory/runtime. Maybe GC issue?
+            var inputCalendar = new GameStateCalendar(numDays, crops.ToDictionary(c => c.name), serializedInputCalendar);
+
+            int availableTiles = inputCalendar.GameStates[day].FreeTiles;
+            double availableGold = inputCalendar.GameStates[day].Wallet;
+
+            var newDaysToEvaluate = new Queue<GetMostProfitableCropArgs>();
+
+            foreach (var crop in crops)
+            {
+                bool thisCropScheduleCompleted = true;
+
+                // OLD APPROACH
+                // Tree data structure: make shallow read-only copy of previous days, and deep copy of current and future days since we mean to modify them.
+                //var thisCropCalendar = new GameStateCalendar(args.Calendar, startingDay: day, endingDay: numDays + 1);
+
+                // Deep copy of specified range only.
+                var thisCropCalendar = new GameStateCalendar(inputCalendar, day, numDays + 1);
+
+                // Calculate number of units to plant.
+                int unitsCanAfford = crop.buyPrice != 0 ? ((int)(availableGold / crop.buyPrice)) : int.MaxValue;
+                bool goldLimited = availableTiles != -1 ? availableTiles >= unitsCanAfford : true;
+                int unitsToPlant = goldLimited ? unitsCanAfford : availableTiles;
+
+                // Short-circuit number of units if too close to end of month for it to make money.
+                if ((day + crop.timeToMaturity > numDays) || (crop.NumHarvests(day, numDays) == 1 && crop.buyPrice >= crop.sellPrice))
+                    unitsToPlant = 0;
+
+                if (unitsToPlant > 0)
+                {
+                    // Update game state based on the current purchase.
+                    if (ReturnTilesAsap)
+                        UpdateCalendar(thisCropCalendar, unitsToPlant, crop, day, numDays);
+                    else
+                        UpdateCalendar_HoldTiles(thisCropCalendar, unitsToPlant, crop, day, numDays);
+
+                    // Queue up updating game state based on subsequent purchases.
+                    int nextDay = MultiCrop ? day : day + 1;
+                    for (int j = nextDay; j <= numDays; ++j)
+                    {
+                        // Be careful with increasing the threshold. In a past implementation, it counter-intuitively increased the state space from 2000 to 6000. In another implementation, it made the results incorrect.
+                        //goldLowerLimit = Math.Max(InvestmentThreshold * MyCurrentValue(thisCropCalendar.GameStates[j]), goldLowerLimit);
+                        //if (thisCropCalendar.GameStates[j].Wallet >= cheapestCrop.buyPrice && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0))
+                        if (thisCropCalendar.GameStates[j].Wallet >= cheapestCropBuyPrice && thisCropCalendar.GameStates[j].Wallet >= startingGold * GoldInvestmentThreshold
+                            && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > 0) && (thisCropCalendar.GameStates[j].FreeTiles == -1 || thisCropCalendar.GameStates[j].FreeTiles > startingTiles * TileInvestmentThresold))
+                        {
+                            thisCropScheduleCompleted = false;
+                            newDaysToEvaluate.Enqueue(new GetMostProfitableCropArgs(j, thisCropCalendar));
+                            break;
+                        }
+                    }
+                }
+                else
+                    thisCropScheduleCompleted = true;
+
+                // Choose today's crop based on the most profitable schedule
+                double thisCropWealth = thisCropCalendar?.GameStates[numDays + 1].Wallet ?? 0;
+            }
+
+            return newDaysToEvaluate;
         }
 
         /// <summary>
@@ -651,7 +867,7 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// Update calendar to reflect planting this batch on this day. Returns tiles on day of harvest!
         /// </summary>
-        private void UpdateCalendar(GameStateCalendar calendar, in int unitsToPlant, in Crop crop, int day, in int numDays)
+        private static void UpdateCalendar(GameStateCalendar calendar, in int unitsToPlant, in Crop crop, int day, in int numDays)
         {
             if (unitsToPlant <= 0)
                 return;
@@ -703,7 +919,7 @@ namespace StardewCropCalculatorLibrary
         /// <summary>
         /// Update calendar to reflect planting this batch on this day. Returning tiles coincides with payday.
         /// </summary>
-        private void UpdateCalendar_HoldTiles(GameStateCalendar calendar, in int unitsToPlant, in Crop crop, int day, in int numDays)
+        private static void UpdateCalendar_HoldTiles(GameStateCalendar calendar, in int unitsToPlant, in Crop crop, int day, in int numDays)
         {
             if (unitsToPlant <= 0)
                 return;
@@ -776,68 +992,62 @@ namespace StardewCropCalculatorLibrary
 
             double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(value))) - (SignificantDigits - 1));
 
-            return Math.Round(value / scale) * scale;
+            var rounded = Math.Round(value / scale) * scale;
+
+            // Clean up potential floating-point noise
+            return Math.Round(rounded, SignificantDigits);
         }
 
         /// <summary>
         /// Serialize game state from the startingDay onward.
         /// </summary>
-        private static string SerializeGameStateCalendar(GameStateCalendar calendar, int startingDay = 0)
+        internal static string SerializeGameStateCalendar(GameStateCalendar calendar, int startingDay, bool includePlants = false, bool round = true)
         {
-            StringBuilder serializedGameStateSb = new StringBuilder();
+            var serializedGameStateSb = new StringBuilder();
             int finalDay = calendar.NumDays + 1;
 
             for (int day = startingDay; day <= finalDay; ++day)
             {
                 var gameStateDay = calendar.GameStates[day];
 
-                if (gameStateDay.DayOfInterest || day == finalDay)
-                    serializedGameStateSb.AppendLine($"{day}_{RoundToSignificantDigits(gameStateDay.Wallet)}_{RoundToSignificantDigits(gameStateDay.FreeTiles)}");
+                if (gameStateDay.DayOfInterest || day == finalDay || day == startingDay)
+                {
+                    int roundedWallet = round ? (int) RoundToSignificantDigits(gameStateDay.Wallet) : (int) gameStateDay.Wallet;
+                    int roundedTiles = round ? (int) RoundToSignificantDigits(gameStateDay.FreeTiles) : gameStateDay.FreeTiles;
+
+                    serializedGameStateSb.Append($"{day}_{roundedWallet}_{roundedTiles}_");
+
+                    if (includePlants)
+                    {
+                        for(int plantIndex = 0; plantIndex < gameStateDay.Plants.Count; ++plantIndex)
+                        {
+                            if (plantIndex > 0)
+                                serializedGameStateSb.Append('-');
+
+                            var plant = gameStateDay.Plants[plantIndex];
+                            serializedGameStateSb.Append($"{plant.CropType};{plant.Count};{plant.PlantDay};{plant.NumDays}");
+                        }
+                    }
+
+                    serializedGameStateSb.AppendLine();
+                }
             }
 
             return serializedGameStateSb.ToString();
         }
 
-        private bool CheckMemoryLimit()
+        private Tuple<double, GameStateCalendar> MemoryFailure()
         {
-            long memoryInBytes = GC.GetTotalMemory(false);
-            double memoryInGB = memoryInBytes / (1024.0 * 1024.0 * 1024.0);
+            Console.WriteLine($"Error: canceled schedule generation due to high memory usage.");
 
-            Console.WriteLine($"Stats: Number of operations: {numOperationsStat.ToString("N0")}, cacheHits: {numCacheHitsStat}");
-            Console.WriteLine($"Memory usage: {memoryInGB:F3} GB");
+            nodeCache.Clear();
+            daysToEvaluate.Clear();
 
-            if (memoryInGB >= MemoryThreshold)
-                return true;
-            else
-                return false;
+            GC.Collect();
+            GC.WaitForPendingFinalizers(); // Ensures finalizers are run
+            GC.Collect(); // Collects again to free objects finalized in the first pass
+
+            return Tuple.Create(-2.0, new GameStateCalendar(NumDays, startingTiles, startingGold));
         }
-
-        //private bool CanPlantInFuture(int currentDay, GameStateCalendar calendar)
-        //{
-        //    int numDays = calendar.NumDays;
-
-        //    for (int day = currentDay + 1; day <= numDays; ++day)
-        //    {
-        //        double availableGold = calendar.GameStates[day].Wallet;
-        //        int availableTiles = calendar.GameStates[day].FreeTiles;
-
-        //        if (availableGold > 0 && (availableTiles > 0 || availableTiles == -1))
-        //        {
-        //            // Check if any crop can be planted on this day
-        //            foreach (var crop in Crops)
-        //            {
-        //                if (day + crop.timeToMaturity <= numDays)
-        //                {
-        //                    int unitsCanAfford = (int)(availableGold / crop.buyPrice);
-
-        //                    if (unitsCanAfford > 0)
-        //                        return true; // Planting is possible in the future
-        //                }
-        //            }
-        //        }
-        //    }
-
-        //    return false; // No planting actions possible in future days
-        //}
     }
 }

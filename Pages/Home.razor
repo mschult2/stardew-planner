@@ -1,6 +1,7 @@
 ﻿@page "/"
 
 @using StardewCropCalculatorLibrary
+@inject GameStateCalendarFactory calendarFactory
 
 <PageTitle>Stardew Valley Crop Planner</PageTitle>
 
@@ -674,7 +675,7 @@
     /* Test 0: Infinite Gold. Result: whatever the most profitable fruit is. Strawberry, Starfruit, or Sweet Gem Berry. */
 
     /* Test 1: Infinite Tiles (ROI)
-     * Answer is a bunch of peps, D16 melon, then a bunch of peps. Profit 235.6k. */
+    * Answer is a bunch of peps, D16 melon, then a bunch of peps. Profit 235.6k. */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
     //     new Crop("Blueberry", 13, 4, 80, 150),
@@ -799,7 +800,7 @@
     // private int AvailableTiles = 500000;
 
     /* Test 9: Very High TG 4.0
-     * Result: 22 million g. Schedule: d1 10k wheat, d5 25k wheat, d9 62.5k wheat, d13 156k wheat, d17 391k wheat, d21 244k rad.
+    * Result: 22 million g. Schedule: d1 10k wheat, d5 25k wheat, d9 62.5k wheat, d13 156k wheat, d17 391k wheat, d21 244k rad.
     */
     // private static readonly List<Crop> DefaultCrops = new()
     // {
@@ -990,8 +991,6 @@
     // Default crop list
     private List<Crop> Crops = new List<Crop>(DefaultCrops);
 
-    private GameStateCalendarFactory calendarFactory = new GameStateCalendarFactory(DefaultNumDays, DefaultCrops, DefaultDay);
-
     private PlantSchedule Schedule = new(DefaultNumDays);
     private DayDetails[] ScheduleDetails = new DayDetails[DefaultNumDays + 1];
 
@@ -1014,20 +1013,17 @@
 
     private void OnCurrentDayChanged()
     {
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
         ClearSchedule();
     }
 
     private void OnNumDaysChanged()
     {
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
         ClearSchedule();
     }
 
     private void ToggleCrop(Crop crop, ChangeEventArgs e)
     {
         crop.IsEnabled = (bool)e.Value;
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
     private void UpdateCropEnabledState(bool toggledAll = false)
@@ -1054,8 +1050,6 @@
                 }
             }
         }
-
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
     // Add a new crop to the list
@@ -1078,8 +1072,6 @@
             NewCropYieldRate = 0;
             NewCropBuyPrice = 0;
             NewCropSellPrice = 0;
-
-            calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
         }
     }
 
@@ -1087,7 +1079,6 @@
     private void DeleteCrop(Crop crop)
     {
         Crops.Remove(crop);
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
     // Delete all crops
@@ -1095,7 +1086,6 @@
     {
         Crops.Clear();
         ClearSchedule();
-        calendarFactory = new GameStateCalendarFactory(NumDays, Crops, CurrentDay);
     }
 
     private void ClearSchedule()
@@ -1108,8 +1098,11 @@
         Profit = -1;
     }
 
-    // Generate the planting schedule
-    private async void GenerateCalendar()
+    /// <summary>
+    /// Generate the planting schedule.
+    /// Note: GetBestSchedule() must be non-blocking. Else there's no way to prevent the browser click events from queuing up until the event loop is unblocked.
+    /// </summary>
+    private async Task GenerateCalendar()
     {
         ClearSchedule();
 
@@ -1123,7 +1116,7 @@
             // Calculate schedule with simulation (slow)
             if (AvailableTiles > 0)
             {
-                var wealthAndCalendar = await calendarFactory.GetBestSchedule(AvailableTiles, AvailableGold);
+                var wealthAndCalendar = await calendarFactory.GetBestSchedule(Crops, CurrentDay, NumDays, AvailableTiles, AvailableGold);
 
                 // Copy to UI elements: Profit, ROI
                 var totalWealth = wealthAndCalendar.Item1;
