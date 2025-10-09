@@ -48,18 +48,59 @@
             font-size: 3rem;
             font-weight: 600;
             color: #5ecbff;
+            display: inline-block;
+            animation: plantBounce 2s ease-in-out infinite;
+            transform-origin: center bottom;
         }
 
-        /* Loading spinner */
-        .spinner {
-            opacity: 0;
+        @keyframes plantBounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+
+            25% {
+                transform: translateY(-18px); /* bounce up */
+            }
+
+            50% {
+                transform: translateY(0);
+            }
+
+            75% {
+                transform: translateY(-12px); /* smaller bounce */
+            }
+        }
+
+        .spinner-wrapper {
+            position: relative;
+            width: 130px;
+            height: 130px;
             margin-top: 3rem;
+            opacity: 0;
+            animation: fadeIn 0.5s linear 1.5s forwards; /* fade in spinner & text together */
+        }
+
+        .spinner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 130px;
+            height: 130px;
             border: 13px solid #f3f3f3;
             border-top: 10px solid #3498db;
             border-radius: 50%;
-            width: 130px;
-            height: 130px;
             animation: spin 1s linear infinite;
+        }
+
+        .spinner-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f0f0f0;
+            font-size: 1.1rem;
+            font-weight: 500;
+            pointer-events: none; /* clicks pass through */
         }
 
         @keyframes spin {
@@ -72,10 +113,10 @@
             }
         }
 
-        .loading-progress-text {
-            margin-top: 0.5rem;
-            font-size: 1rem;
-            color: #bbb;
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
         }
 
         /* Error UI styling */
@@ -100,9 +141,12 @@
 </head>
 
 <body>
-    <div id="app" onclick="showSpinner()">
+    <div id="app">
         <div class="splash-logo">🌱 Crop Planner</div>
-        <div class="spinner"></div>
+        <div class="spinner-wrapper">
+            <div class="spinner"></div>
+            <div class="spinner-text">Loading...</div>
+        </div>
     </div>
 
     <div id="blazor-error-ui">
