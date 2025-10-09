@@ -417,6 +417,10 @@
             gap: 8px; /* Space between label and input/span */
         }
 
+        .aligned-form .form-row span {
+            color: gray;
+        }
+
         .aligned-form label {
             min-width: 150px; /* Ensure consistent label width */
             text-align: right;
@@ -562,6 +566,95 @@
             transform: rotate(360deg);
         }
     }
+
+
+
+    /* === DARK THEME OVERRIDES === */
+
+    body {
+        background-color: #1E1E1E;
+        color: #f0f0f0;
+    }
+
+    /* Inputs and text fields */
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+        background-color: #333333;
+        color: #f0f0f0;
+        border: 1px solid #4b4b4b;
+    }
+
+    input::placeholder {
+        color: #999;
+    }
+
+    /* Calendar elements */
+    .calendar-table th {
+        background-color: #1e1e1e;
+        color: #f0f0f0;
+        border-color: #333;
+    }
+
+    .calendar-table td {
+        background-color: #181818;
+        color: #f0f0f0;
+        border-color: #333;
+    }
+
+    .calendar-table .planting-day {
+        background-color: #00c853; /* softer neon green for dark mode */
+        color: #fff;
+    }
+
+    .disabled-day {
+        background-color: #2b2b2b;
+        color: #777;
+    }
+
+    .harvest-marker {
+        color: #ffc680;
+    }
+
+    /* Spinner overlay for loading */
+    .calendar-overlay {
+        background-color: rgba(0, 0, 0, 0.7);
+        color: #fff;
+    }
+
+    /* Crop colors (keep their unique hues but slightly brighten for dark bg) */
+    .crop-item.spring {
+        color: #4caf50;
+    }
+    .crop-item.summer {
+        color: #ffca28;
+    }
+    .crop-item.fall {
+        color: #ff8a65;
+    }
+    .crop-item.winter {
+        color: #64b5f6;
+    }
+
+    /* Fix white bar at top */
+    .top-row,
+    .navbar,
+    header {
+        background-color: #121212 !important;
+        border-bottom: 1px solid #333 !important;
+        color: #f0f0f0 !important;
+    }
+
+        .top-row a,
+        .navbar a {
+            color: #42a5f5 !important;
+        }
+
+            .top-row a:hover,
+            .navbar a:hover {
+                color: #64b5f6 !important;
+            }
 
 </style>
 
