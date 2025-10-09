@@ -14,6 +14,14 @@
     <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
 
+    <script>
+        function showSpinner() {
+            var s = document.querySelector(".spinner");
+            if (!s) return;
+            s.style.opacity = "1";
+        }
+    </script>
+
     <!-- Dark background and splash styles -->
     <style>
         html,
@@ -43,32 +51,24 @@
         }
 
         /* Loading spinner */
-        .loading-progress {
-            width: 80px;
-            height: 80px;
-            animation: spin 1.4s linear infinite;
+        .spinner {
+            opacity: 0;
+            margin-top: 3rem;
+            border: 13px solid #f3f3f3;
+            border-top: 10px solid #3498db;
+            border-radius: 50%;
+            width: 130px;
+            height: 130px;
+            animation: spin 1s linear infinite;
         }
-
-            .loading-progress circle {
-                fill: none;
-                stroke: #42a5f5;
-                stroke-width: 8;
-                stroke-linecap: round;
-                transform-origin: 50% 50%;
-                transform: rotate(-90deg);
-            }
-
-                .loading-progress circle:last-child {
-                    stroke: rgba(94, 203, 255, 0.4);
-                }
 
         @keyframes spin {
             0% {
-                transform: rotate(-90deg);
+                transform: rotate(0deg);
             }
 
             100% {
-                transform: rotate(270deg);
+                transform: rotate(360deg);
             }
         }
 
@@ -100,14 +100,9 @@
 </head>
 
 <body>
-    <div id="app">
-        <!-- intro splash screen is better than a loading screen -->
-        <!--<svg class="loading-progress" viewBox="0 0 100 100">
-            <circle r="40" cx="50" cy="50" />
-            <circle r="40" cx="50" cy="50" />
-        </svg>-->
+    <div id="app" onclick="showSpinner()">
         <div class="splash-logo">🌱 Crop Planner</div>
-        <!--<div class="loading-progress-text">Loading...</div>-->
+        <div class="spinner"></div>
     </div>
 
     <div id="blazor-error-ui">
