@@ -5,6 +5,14 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 	<ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+
+    <!-- Minimize download size -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <BlazorEnableCompression>true</BlazorEnableCompression>
+    <!-- Ensure AOT is off if you prioritize small downloads -->
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <PublishAot>false</PublishAot>
   </PropertyGroup>
 
   <ItemGroup>
