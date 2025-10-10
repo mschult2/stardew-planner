@@ -35,7 +35,7 @@
         }
 
         /* Splash screen container */
-        #app {
+        #splash-screen {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -140,25 +140,27 @@
     </style>
 </head>
 
-<body>
-    <div id="app">
-        <div class="splash-logo">🌱 Crop Planner</div>
-        <div class="spinner-wrapper">
-            <div class="spinner"></div>
-            <div class="spinner-text">Loading...</div>
+    <body>
+        <div id="app">
+            <div id="splash-screen">
+                <div class="splash-logo">🌱 Crop Planner</div>
+                <div class="spinner-wrapper">
+                    <div class="spinner"></div>
+                    <div class="spinner-text">Loading...</div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="" class="reload">Reload</a>
-        <a class="dismiss">🗙</a>
-    </div>
+        <div id="blazor-error-ui">
+            An unhandled error has occurred.
+            <a href="" class="reload">Reload</a>
+            <a class="dismiss">🗙</a>
+        </div>
 
-    <script src="_framework/blazor.webassembly.js"></script>
-    <script>
-        navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
-    </script>
-</body>
+        <script src="_framework/blazor.webassembly.js"></script>
+        <script>
+            navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
+        </script>
+    </body>
 
 </html>
