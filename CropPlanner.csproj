@@ -8,7 +8,6 @@
 
     <!-- Minimize download size -->
     <PublishTrimmed>true</PublishTrimmed>
-    <InvariantGlobalization>true</InvariantGlobalization>
     <BlazorEnableCompression>true</BlazorEnableCompression>
     <!-- Ensure AOT is off if you prioritize small downloads -->
     <RunAOTCompilation>false</RunAOTCompilation>
